@@ -1,0 +1,270 @@
+---
+title: Hàm tổng hợp
+description: Gộp nhiều hàng thành một con số với COUNT, SUM, AVG, MIN, MAX; phân biệt COUNT(*), COUNT(cột) và COUNT(DISTINCT cột), và hiểu vì sao hàm tổng hợp bỏ qua NULL.
+order: 12
+---
+
+Từ bài 1 tới bài 11, phần lớn câu truy vấn (query) trả về **một hàng (row) kết quả (result set) cho mỗi hàng dữ liệu** được giữ lại: lọc, sắp xếp, biến đổi, gắn nhãn, nhưng 12 khách vẫn là 12 hàng. (Ngoại lệ đáng kể là `DISTINCT` ở bài 9, vốn gộp các hàng trùng nhau.) Trong khi đó, nhiều câu hỏi của chủ cửa hàng chỉ cần **một con số**: cửa hàng có bao nhiêu khách? Tổng cộng còn bao nhiêu món trong kho? Sản phẩm rẻ nhất giá bao nhiêu?
+
+Để trả lời, SQL có hàm tổng hợp (aggregate function): hàm nhận vào **cả một cột (column) của nhiều hàng** và trả về **một giá trị**. Bài này giới thiệu năm hàm tổng hợp cơ bản, ba cách dùng `COUNT` cho ba câu hỏi khác nhau, và cách hàm tổng hợp xử lý NULL.
+
+## Gộp nhiều hàng thành một: COUNT
+
+Hàm `COUNT(*)` đếm số hàng:
+
+<Playground>
+```sql
+SELECT COUNT(*) AS so_khach
+FROM customers;
+```
+</Playground>
+
+Kết quả chỉ có **1 hàng, 1 cột**: `so_khach` bằng 12. Bảng (table) `customers` có 12 hàng, nhưng hàm tổng hợp gộp cả 12 lại thành một. Đây là khác biệt lớn với các hàm của bài 10: `UPPER(name)` được tính cho **từng hàng** và trả về 12 giá trị, còn `COUNT(*)` được tính **trên cả nhóm hàng** và trả về 1 giá trị. Dấu `*` ở đây nghĩa là "đếm hàng", không quan tâm cột nào.
+
+Hàm tổng hợp làm việc trên những hàng **còn lại sau `WHERE`**. Thứ tự xử lý vẫn như bài 4: `FROM` lấy bảng, `WHERE` lọc từng hàng, rồi các hàng còn lại mới được **gộp** lại để tính hàm tổng hợp; `SELECT` hiển thị kết quả gộp đó:
+
+<Playground>
+```sql
+SELECT COUNT(*) AS so_don,
+       MIN(ordered_on) AS don_dau_tien,
+       MAX(ordered_on) AS don_gan_nhat
+FROM orders
+WHERE status = 'đã giao';
+```
+</Playground>
+
+Có 12 đơn `đã giao` trong tổng số 20 đơn. Câu lệnh (statement) còn dùng thêm hai hàm tổng hợp: `MIN` lấy giá trị nhỏ nhất, `MAX` lấy giá trị lớn nhất. Đơn đã giao đầu tiên đặt ngày 2025-03-02, đơn đã giao gần nhất đặt ngày 2025-10-18. Đơn 20 đặt ngày 2025-11-16 là đơn mới nhất của cả bảng, nhưng nó đang `chờ xác nhận` nên đã bị `WHERE` loại trước khi `MAX` được tính. Nhiều hàm tổng hợp đặt chung một `SELECT` vẫn cho ra **một hàng**, mỗi hàm một cột.
+
+## SUM, AVG, MIN, MAX
+
+Ngoài `COUNT`, bảng dưới tóm tắt bốn hàm còn lại. Hai hàm mới là `SUM` và `AVG`; `MIN`/`MAX` bạn vừa gặp:
+
+| Hàm | Trả về |
+|---|---|
+| `SUM(cột)` | tổng các giá trị |
+| `AVG(cột)` | trung bình cộng (average) |
+| `MIN(cột)` / `MAX(cột)` | giá trị nhỏ nhất / lớn nhất |
+
+<Playground>
+```sql
+SELECT SUM(stock) AS tong_ton,
+       MIN(price) AS re_nhat,
+       MAX(price) AS dat_nhat,
+       AVG(price) AS gia_tb,
+       ROUND(AVG(price)) AS gia_tb_tron
+FROM products;
+```
+</Playground>
+
+Cả 12 sản phẩm cộng lại còn 580 món trong kho. Giá thấp nhất là 45000 (phin nhôm), cao nhất là 450000 (máy xay). Giá trung bình là `179083.33333333334` trên SQLite (PostgreSQL hiện `179083.333333333333`): trung bình cộng thường có phần thập phân, kể cả khi mọi giá đều là số nguyên. `ROUND` của bài 10 bọc ngoài `AVG` cho ra 179083.
+
+Hàm thường có thể bọc ngoài hàm tổng hợp (`ROUND(AVG(price))`) hoặc nằm bên trong nó (`AVG(COALESCE(…))`, sẽ gặp ở phần sau). Nhưng không lồng hàm tổng hợp vào hàm tổng hợp: `AVG(COUNT(*))` báo lỗi, vì `COUNT(*)` đã gộp cả bảng thành một giá trị, `AVG` không còn nhiều hàng nào để gộp nữa.
+
+Lưu ý rằng `MIN` và `MAX` chỉ cho biết **giá trị**, không cho biết sản phẩm nào có giá đó. Muốn biết tên sản phẩm đắt nhất, bạn vẫn dùng cách của bài 9: `ORDER BY price DESC LIMIT 1`. Phần "Lỗi hay gặp" sẽ nói vì sao không viết `SELECT name, MAX(price)`.
+
+### Tổng hợp trên biểu thức
+
+Bên trong hàm tổng hợp có thể là một biểu thức (expression), không nhất thiết là một cột. Database tính biểu thức cho từng hàng trước, rồi mới gộp. Ô dưới đây xem đơn 5 có gì:
+
+<Playground>
+```sql
+SELECT COUNT(*) AS so_mon,
+       SUM(quantity) AS so_luong,
+       SUM(quantity * unit_price) AS thanh_tien
+FROM order_items
+WHERE order_id = 5;
+```
+</Playground>
+
+Đơn 5 có 3 hàng trong `order_items`, tức 3 sản phẩm khác nhau: Robusta (1 gói, 110000), bình giữ nhiệt (1 cái, 215000) và bánh pía (2 hộp, 75000 mỗi hộp). `COUNT(*)` đếm **hàng** nên ra 3. `SUM(quantity)` cộng **số lượng** nên ra 4, vì bánh pía có 2 hộp. Hai con số trả lời hai câu hỏi khác nhau ("mấy loại sản phẩm" và "mấy món"), nên hãy chọn đúng hàm cho câu hỏi. `SUM(quantity * unit_price)` tính `quantity * unit_price` cho từng hàng (110000, 215000, 150000) rồi cộng lại: đơn 5 trị giá 475000 đồng. Cột `unit_price` là giá lúc bán; bài 1 đã nói nó có thể khác `price` hiện tại (Robusta lúc đó giá 110000, nay 120000).
+
+<Callout type="try">
+Đổi `order_id = 5` thành `order_id = 13`. Đơn 13 cũng có 3 sản phẩm, nhưng mỗi sản phẩm 1 món, nên `so_mon` và `so_luong` bằng nhau.
+</Callout>
+
+### MIN và MAX trên chữ và ngày
+
+`MIN` và `MAX` không chỉ dùng cho số. Với ngày, nhỏ nhất là ngày sớm nhất. Với chữ, "nhỏ nhất" là giá trị đứng đầu khi sắp xếp tăng dần, theo đúng thứ tự ký tự của bài 8:
+
+<Playground>
+```sql
+SELECT MIN(joined_on) AS dang_ky_som_nhat,
+       MAX(joined_on) AS dang_ky_muon_nhat,
+       MIN(name) AS ten_dau,
+       MAX(name) AS ten_cuoi
+FROM customers;
+```
+</Playground>
+
+Khách đăng ký sớm nhất vào 2024-02-11, muộn nhất vào 2025-10-02. Tên "nhỏ nhất" là Bùi Anh Tuấn, tên "lớn nhất" là Đặng Gia Linh. Đặng Gia Linh đứng cuối vì chữ `Đ` có mã ký tự lớn hơn mọi chữ cái không dấu, giống chuyện "Đà Nẵng" đứng sau "TP.HCM" ở bài 8. `SUM` và `AVG` thì chỉ có nghĩa với số.
+
+## Ba cách đếm: COUNT(*), COUNT(cột), COUNT(DISTINCT cột)
+
+`COUNT` có ba dạng, trả lời ba câu hỏi khác nhau:
+
+- `COUNT(*)`: có bao nhiêu **hàng**.
+- `COUNT(cột)`: có bao nhiêu hàng mà cột đó **không phải NULL**.
+- `COUNT(DISTINCT cột)`: có bao nhiêu **giá trị khác nhau** (không tính NULL) trong cột. `DISTINCT` ở đây là từ khóa (keyword) của bài 9, đặt bên trong ngoặc.
+
+<Playground>
+```sql
+SELECT COUNT(*) AS so_khach,
+       COUNT(phone) AS co_sdt,
+       COUNT(email) AS co_email,
+       COUNT(DISTINCT city) AS so_thanh_pho,
+       COUNT(referred_by) AS duoc_gioi_thieu,
+       COUNT(DISTINCT referred_by) AS so_nguoi_gioi_thieu
+FROM customers;
+```
+</Playground>
+
+Một câu lệnh, sáu con số, đọc từng cột:
+
+- `so_khach` = 12: bảng có 12 hàng.
+- `co_sdt` = 7: 5 khách có `phone` là NULL (bài 7) nên không được đếm.
+- `co_email` = 10: 2 khách (Phạm Quốc Huy, Ngô Đức Thịnh) chưa có email.
+- `so_thanh_pho` = 6: Hà Nội lặp 4 lần, TP.HCM 3 lần, Đà Nẵng 2 lần, nhưng chỉ tính mỗi thành phố một lần.
+- `duoc_gioi_thieu` = 7: 7 khách có người giới thiệu; 5 khách tự tìm đến có `referred_by` là NULL.
+- `so_nguoi_gioi_thieu` = 5: trong 7 giá trị đó chỉ có 5 người khác nhau, vì chị Hà (mã 1) giới thiệu tới 3 người.
+
+Hai câu hỏi "bao nhiêu khách được giới thiệu" và "bao nhiêu người đã giới thiệu" nghe gần giống nhau, nhưng đáp án khác nhau. Cũng lưu ý: ở bài 9, `SELECT DISTINCT referred_by` ra **6** hàng vì giữ lại một hàng NULL; còn `COUNT(DISTINCT referred_by)` bỏ qua NULL nên ra **5**.
+
+## Hàm tổng hợp và NULL
+
+Bạn đã thấy `COUNT(phone)` không đếm các ô NULL. Quy tắc này đúng với cả năm hàm tổng hợp của bài này, trừ `COUNT(*)`: `SUM`, `AVG`, `MIN`, `MAX` đều bỏ qua NULL, như thể hàng đó không có mặt. Điều này hợp với ý nghĩa "không biết" của NULL ở bài 7: một giá trị không biết thì không thể cộng vào tổng hay đem so lớn nhỏ.
+
+Trong dataset, các cột số có ý nghĩa để cộng hay tính trung bình (`price`, `stock`, `quantity`, `unit_price`) đều không có NULL, nên ô dưới đây tự tạo NULL bằng `CASE` của bài 11: cột tạm này bằng `price` nếu sản phẩm còn hàng, và NULL nếu hết hàng (không có `ELSE`).
+
+<Playground>
+```sql
+SELECT COUNT(*) AS tat_ca,
+       COUNT(CASE WHEN stock > 0 THEN price END) AS con_hang,
+       AVG(CASE WHEN stock > 0 THEN price END) AS tb_bo_qua_null,
+       AVG(COALESCE(CASE WHEN stock > 0 THEN price END, 0)) AS tb_tinh_la_0
+FROM products;
+```
+</Playground>
+
+Có 12 sản phẩm, 10 sản phẩm còn hàng; bình giữ nhiệt và bánh pía hết hàng nên giá trị tạm của chúng là NULL. `tb_bo_qua_null` bằng 185900: `AVG` chỉ lấy 10 giá trị không NULL, cộng lại rồi chia cho **10**. Đó đúng là giá trung bình của các sản phẩm còn hàng; viết `WHERE stock > 0` rồi `AVG(price)` cũng ra 185900. Cột cuối dùng `COALESCE` (bài 7) đổi NULL thành 0 trước khi tính trung bình, nên `AVG` chia cho **12**, và kết quả tụt xuống `154916.66666666666`, như thể hai sản phẩm hết hàng có giá 0 đồng.
+
+<Callout type="try">
+`MIN` và `MAX` cũng bỏ qua NULL. Chạy `SELECT MIN(shipped_on) AS gui_som_nhat FROM orders;` trong ô trên: kết quả là 2025-03-04, không phải NULL, dù bài 8 cho thấy SQLite xếp NULL lên đầu khi sắp tăng dần. Năm đơn chưa gửi đơn giản là không được xét.
+</Callout>
+
+Bỏ qua NULL hay coi NULL là 0 tùy câu hỏi; chỉ cần nhớ `AVG` mặc định **bỏ qua**.
+
+### Không có hàng nào thì sao?
+
+Khi `WHERE` loại hết mọi hàng, hàm tổng hợp vẫn trả về **một hàng**:
+
+<Playground>
+```sql
+SELECT COUNT(*) AS so_san_pham,
+       SUM(stock) AS tong_ton,
+       MAX(price) AS dat_nhat,
+       COALESCE(SUM(stock), 0) AS tong_ton_mac_dinh
+FROM products
+WHERE category = 'Mỹ phẩm';
+```
+</Playground>
+
+Cửa hàng không bán mỹ phẩm, nên không hàng nào qua được `WHERE`. Kết quả vẫn có 1 hàng: `so_san_pham` là 0, nhưng `tong_ton` và `dat_nhat` là **NULL**, không phải 0. Đếm không có gì thì được 0; còn tổng hay giá lớn nhất của "không có gì" thì không xác định. Nếu bạn muốn hiện 0, bọc `SUM` trong `COALESCE` như cột cuối.
+
+## Bên trong database: gộp trong một lượt đọc
+
+Để tính `SUM(stock)`, database không cần giữ cả 12 hàng trong bộ nhớ. Nó đọc lần lượt từng hàng qua `WHERE` và giữ một **biến tích lũy**: bắt đầu từ "chưa có gì", mỗi hàng không NULL thì cộng thêm vào. `COUNT` giữ một bộ đếm, `MIN`/`MAX` giữ giá trị nhỏ nhất/lớn nhất tới lúc đó, `AVG` giữ cả tổng lẫn số lượng rồi chia ở cuối. Đọc hết bảng thì trả về kết quả. Đây cũng là lý do khi không còn hàng nào (hoặc mọi giá trị đều NULL), `SUM` là NULL: biến tích lũy chưa từng nhận giá trị nào.
+
+`COUNT(DISTINCT …)` thì tốn công hơn: database phải nhớ những giá trị đã gặp để không đếm lại, giống `SELECT DISTINCT` ở bài 9.
+
+Vì hàm tổng hợp gộp mọi hàng thành một, kết quả của nó chỉ có **sau** khi mọi hàng đã đi qua mệnh đề (clause) `WHERE`. Do đó `WHERE` không dùng được hàm tổng hợp: lúc `WHERE` kiểm tra từng hàng, trung bình của cả bảng chưa được tính. Bài 13 và 14 sẽ đặt bước gộp này vào thứ tự xử lý đầy đủ, và giới thiệu mệnh đề lọc **sau** khi gộp.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Trộn cột thường với hàm tổng hợp">
+`SELECT name, MAX(price) FROM products` trông như "tên và giá của sản phẩm đắt nhất". Nhưng hàm tổng hợp gộp 12 hàng thành 1, còn `name` có 12 giá trị: database lấy tên nào? PostgreSQL báo lỗi `column "products.name" must appear in the GROUP BY clause or be used in an aggregate function`. SQLite thì chạy và trả về Máy xay cà phê tay, nhờ một quy tắc riêng chỉ áp dụng cho `MIN`/`MAX`. Đừng dựa vào nó: với `AVG` hay `SUM`, tên đi kèm là một hàng bất kỳ. Muốn lấy tên sản phẩm đắt nhất, dùng `ORDER BY price DESC LIMIT 1`. Bài 13 sẽ giải thích quy tắc này đầy đủ.
+</Callout>
+
+<Callout type="warn" title="Hàm tổng hợp trong WHERE">
+Câu "tìm sản phẩm đắt hơn giá trung bình" rất tự nhiên, nhưng `WHERE price > AVG(price)` báo lỗi trên cả hai database: SQLite ghi `misuse of aggregate function AVG()`, PostgreSQL ghi `aggregate functions are not allowed in WHERE`. Lý do nằm ở phần "Bên trong database" phía trên. Bài 19 về truy vấn con sẽ giải bài toán này.
+</Callout>
+
+<Callout type="warn" title="Tự tính trung bình bằng SUM / COUNT">
+`SUM(stock) / COUNT(*)` trên `products` ra **48**, còn `AVG(stock)` ra `48.333333333333336`. `SUM` của cột số nguyên (`stock`) và `COUNT` đều là số nguyên, nên phép chia rơi vào bẫy chia số nguyên của bài 3 (trên SQLite và PostgreSQL). Thêm nữa, `COUNT(*)` đếm cả hàng có NULL còn `SUM` thì bỏ qua chúng, nên tự chia có thể sai cả khi không mất phần thập phân. Cần trung bình thì dùng `AVG`.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| `AVG` của cột số nguyên | số thực (`179083.33333333334`) | số thập phân chính xác (`179083.333333333333`) | số thập phân chính xác |
+| Tên cột khi không đặt bí danh (alias) | `COUNT(*)` | `count` | `COUNT(*)` |
+| `SELECT name, MAX(price)` không có `GROUP BY` | chạy | lỗi | lỗi (chế độ mặc định của MySQL 8) |
+| Hàm tổng hợp trong `WHERE` | lỗi | lỗi | lỗi |
+
+Hàng thứ hai là lý do khóa học luôn đặt bí danh cho cột tổng hợp: PostgreSQL đặt tên cột là `count`, `sum`, `max`…, nên hai cột `COUNT` không bí danh sẽ trùng tên nhau.
+
+## Tóm tắt
+
+- Hàm tổng hợp (`COUNT`, `SUM`, `AVG`, `MIN`, `MAX`) gộp mọi hàng còn lại sau `WHERE` thành **một hàng**. Bên trong có thể là cột hoặc biểu thức.
+- `COUNT(*)` đếm hàng, `COUNT(cột)` đếm giá trị không NULL, `COUNT(DISTINCT cột)` đếm giá trị khác nhau.
+- `SUM`, `AVG`, `MIN`, `MAX` bỏ qua NULL; muốn coi NULL là 0 thì dùng `COALESCE` bên trong. Không có hàng nào thì `COUNT` ra 0, các hàm khác ra NULL.
+- `MIN`/`MAX` dùng được cho số, ngày, chữ (theo thứ tự sắp xếp), nhưng chỉ cho biết giá trị, không cho biết hàng nào.
+- Không trộn cột thường với hàm tổng hợp trong `SELECT` (PostgreSQL lỗi), và không dùng hàm tổng hợp trong `WHERE`.
+- Cần trung bình thì dùng `AVG`, đừng tự chia `SUM / COUNT`.
+
+## Bài tập
+
+<Exercise hint="Đơn chưa gửi có shipped_on là NULL. Dạng COUNT nào bỏ qua NULL?">
+Với các đơn đặt **từ ngày 2025-06-01 trở đi**, đếm tổng số đơn (mọi trạng thái) và số đơn **đã được gửi đi** (đã có ngày gửi). Kết quả gồm 1 hàng, 2 cột theo đúng thứ tự đó.
+
+```sql
+SELECT COUNT(*) AS so_don,
+       COUNT(shipped_on) AS da_gui
+FROM orders
+WHERE ordered_on >= '2025-06-01';
+```
+</Exercise>
+
+<Exercise hint="Một khách có thể đặt nhiều đơn. Đếm khách khác nhau cần dạng COUNT thứ ba.">
+Tính từ ngày **2025-09-01** trở đi, có bao nhiêu đơn được **đặt** (tính mọi trạng thái, kể cả đơn đã hủy), và bao nhiêu **khách khác nhau** đã đặt những đơn đó? Kết quả gồm 1 hàng, 2 cột theo thứ tự: số đơn, số khách.
+
+```sql
+SELECT COUNT(*) AS so_don,
+       COUNT(DISTINCT customer_id) AS so_khach
+FROM orders
+WHERE ordered_on >= '2025-09-01';
+```
+</Exercise>
+
+<Exercise hint="Hai hàm tổng hợp có thể đứng trong cùng một biểu thức, giống hai cột trong phép tính của bài 3.">
+Trong danh mục **Trà**, sản phẩm đắt nhất đắt hơn sản phẩm rẻ nhất bao nhiêu đồng? Kết quả gồm 1 hàng, 1 cột: khoảng chênh lệch giá.
+
+```sql
+SELECT MAX(price) - MIN(price) AS chenh_lech
+FROM products
+WHERE category = 'Trà';
+```
+</Exercise>
+
+<Exercise hint="Chạy thử câu có sẵn: kết quả có phần thập phân không? Xem lại phần Lỗi hay gặp." starter={"SELECT ROUND(SUM(stock) / COUNT(*), 1) AS ton_tb\nFROM products\nWHERE category = 'Trà';\n"}>
+Câu lệnh có sẵn trong ô muốn tính **số món tồn kho trung bình** của các sản phẩm danh mục Trà, **làm tròn 1 chữ số thập phân**, nhưng kết quả bị mất phần thập phân. Hãy sửa cho đúng, giữ 1 cột.
+
+```sql
+SELECT ROUND(AVG(stock), 1) AS ton_tb
+FROM products
+WHERE category = 'Trà';
+```
+</Exercise>
+
+<Exercise hint="COUNT bỏ qua NULL, và CASE không có ELSE trả về NULL khi không nhánh nào đúng.">
+Trong **một hàng** kết quả, đếm theo từng điều kiện (condition), mỗi điều kiện một cột: tổng số sản phẩm, số sản phẩm **hết hàng** (`stock` bằng 0), số sản phẩm có **giá từ 200000 đồng trở lên**. Kết quả gồm 3 cột theo đúng thứ tự đó. (Gợi ý: mỗi cột cần một điều kiện riêng, nên không thể dùng một `WHERE` chung.)
+
+```sql
+SELECT COUNT(*) AS tong,
+       COUNT(CASE WHEN stock = 0 THEN 1 END) AS het_hang,
+       COUNT(CASE WHEN price >= 200000 THEN 1 END) AS gia_cao
+FROM products;
+```
+</Exercise>
+
+Mọi câu truy vấn trong bài này gộp **cả bảng** thành một hàng. Nhưng chủ cửa hàng thường muốn hỏi chi tiết hơn: **mỗi** danh mục có bao nhiêu sản phẩm, **mỗi** khách đặt bao nhiêu đơn. Bài tiếp theo giới thiệu `GROUP BY` để chia hàng thành nhóm và tổng hợp riêng từng nhóm.

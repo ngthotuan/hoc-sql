@@ -1,0 +1,18 @@
+---
+// Dùng trong MDX:
+//   <Callout type="try">Thử đổi ...</Callout>      → gợi ý thực hành
+//   <Callout type="note">...</Callout>             → ghi chú, kiến thức bên lề
+//   <Callout type="warn">...</Callout>             → lỗi hay gặp, điều cần cẩn thận
+// title tùy chọn; nếu bỏ trống sẽ dùng tiêu đề mặc định của từng loại.
+interface Props {
+  type?: 'try' | 'note' | 'warn';
+  title?: string;
+}
+const DEFAULT_TITLE = { try: 'Thử ngay', note: 'Ghi chú', warn: 'Cẩn thận' } as const;
+const { type = 'note', title } = Astro.props;
+---
+
+<aside class={`callout callout-${type}`}>
+  <strong class="callout-title">{title ?? DEFAULT_TITLE[type]}</strong>
+  <div class="callout-body"><slot /></div>
+</aside>

@@ -1,0 +1,201 @@
+---
+title: Database và bảng
+description: Hiểu database tổ chức dữ liệu thành bảng, hàng, cột ra sao, làm quen với dữ liệu của cửa hàng và chạy câu SQL đầu tiên.
+order: 1
+---
+
+Hãy tưởng tượng bạn vừa nhận quản lý một cửa hàng cà phê nhỏ bán online. Mỗi ngày có khách mới đăng ký, có đơn hàng mới, có sản phẩm hết hàng. Chủ cửa hàng hỏi bạn: "Tháng này khách ở Hà Nội mua những gì? Sản phẩm nào sắp hết?"
+
+Nếu thông tin nằm rải rác trong tin nhắn và sổ tay, bạn sẽ mất cả buổi để trả lời. Nếu nó nằm trong một **database**, bạn chỉ cần viết vài dòng **SQL**. Bài này giúp bạn hiểu database chứa dữ liệu như thế nào, và chạy câu SQL đầu tiên trên dữ liệu thật của cửa hàng.
+
+## Database, bảng, hàng và cột
+
+Cách dễ nhất để hình dung một database là một file bảng tính (như Excel hay Google Sheets) có nhiều trang:
+
+- Mỗi trang là một **bảng** (table). Mỗi bảng chứa một loại thông tin: một bảng cho khách hàng, một bảng cho sản phẩm.
+- Mỗi **hàng** (row) trong bảng là một đối tượng cụ thể: một khách hàng, một sản phẩm, một đơn hàng.
+- Mỗi **cột** (column) là một thuộc tính mà đối tượng nào cũng có: tên, thành phố, giá bán.
+- **Database** là nơi chứa tất cả các bảng đó, cùng các quy tắc giữ cho dữ liệu đúng.
+
+Điểm khác lớn nhất giữa database và bảng tính là **database có cấu trúc chặt chẽ**. Trong bảng tính, mỗi ô có thể chứa bất cứ thứ gì, và hai trang có thể ghi cùng một thông tin theo hai kiểu khác nhau. Trong database:
+
+- Mỗi bảng có một danh sách cột cố định, và mỗi cột được khai báo một **kiểu dữ liệu** (data type): số nguyên, chuỗi chữ, ngày tháng. PostgreSQL và MySQL sẽ từ chối nếu bạn đưa chữ vào cột giá. SQLite, phần mềm chạy trong các ô thực hành của khóa học, dễ dãi hơn ở điểm này; bài 26 sẽ nói rõ sự khác biệt đó.
+- Mỗi hàng có một mã riêng không trùng với hàng nào khác, thường là cột `id`. Nhờ đó, "khách hàng số 3" luôn chỉ đúng một người.
+- Các bảng liên kết với nhau qua những mã này. Đơn hàng không chép lại tên khách, mà chỉ ghi mã của khách.
+
+Chính sự nghiêm ngặt đó giúp database chứa được hàng triệu hàng mà vẫn trả lời câu hỏi nhanh và chính xác.
+
+## SQL là gì
+
+**SQL** (Structured Query Language) là ngôn ngữ dùng để làm việc với database: hỏi dữ liệu, thêm, sửa, xóa dữ liệu, và tạo bảng. Người làm nghề thường đọc là "ét-kiu-eo" hoặc "si-quồ", cả hai cách đều được hiểu.
+
+Điều đặc biệt của SQL là bạn chỉ cần mô tả **muốn lấy cái gì**, không cần chỉ cho database **lấy bằng cách nào**. Bạn nói "cho tôi danh sách khách ở Hà Nội", còn việc đọc từng hàng trong bảng và chọn hàng nào là việc của database.
+
+Có nhiều phần mềm database khác nhau, phổ biến nhất là **SQLite**, **PostgreSQL** và **MySQL**. Chúng đều hiểu SQL, chỉ khác nhau ở một số chi tiết. Các ô thực hành trong lộ trình này chạy SQLite ngay trên trình duyệt của bạn. Phần lớn điều bạn học ở đây dùng được nguyên vẹn với PostgreSQL và MySQL; chỗ nào khác nhau, bài học sẽ nói rõ.
+
+## Dữ liệu của cửa hàng
+
+Suốt khóa học, chúng ta dùng database của cửa hàng cà phê này. Nó có 4 bảng:
+
+| Bảng | Mỗi hàng là | Các cột |
+|---|---|---|
+| `customers` | một khách hàng | `id`, `name` (tên), `city` (thành phố), `email`, `phone` (số điện thoại), `referred_by` (mã của khách đã giới thiệu), `joined_on` (ngày đăng ký) |
+| `products` | một sản phẩm | `id`, `name`, `category` (danh mục), `price` (giá bán, đơn vị đồng), `stock` (số lượng còn trong kho) |
+| `orders` | một đơn hàng | `id`, `customer_id` (mã khách đặt), `ordered_on` (ngày đặt), `status` (trạng thái), `shipped_on` (ngày gửi hàng) |
+| `order_items` | một sản phẩm trong một đơn | `order_id` (mã đơn), `product_id` (mã sản phẩm), `quantity` (số lượng), `unit_price` (giá mỗi cái lúc đặt) |
+
+Tên bảng và tên cột viết bằng tiếng Anh, không dấu, nối các từ bằng dấu gạch dưới. Đây là quy ước phổ biến: hầu hết database bạn gặp khi đi làm đều đặt tên như vậy.
+
+## Câu lệnh đầu tiên
+
+Câu lệnh (statement) dưới đây yêu cầu database trả về toàn bộ bảng khách hàng. Bấm **Chạy** để xem:
+
+<Playground>
+```sql
+SELECT *
+FROM customers;
+```
+</Playground>
+
+Kết quả (result set) là một bảng gồm **12 hàng** (12 khách hàng) và **7 cột**. Đọc câu lệnh từ trái sang phải:
+
+- `SELECT` nghĩa là "lấy ra". Câu hỏi dữ liệu trong SQL thường bắt đầu bằng từ này.
+- `*` nghĩa là "tất cả các cột".
+- `FROM customers` nghĩa là "từ bảng `customers`".
+- Dấu `;` đánh dấu kết thúc câu lệnh.
+
+Ghép lại: "lấy tất cả các cột từ bảng khách hàng". Một câu SQL dùng để hỏi dữ liệu như thế này gọi là **câu truy vấn** (query). `SELECT` và `FROM` là **từ khóa** (keyword): những từ có ý nghĩa cố định mà database hiểu được. Trong khóa học, từ khóa luôn được viết hoa để dễ phân biệt với tên bảng và tên cột. Bài sau sẽ giải thích vì sao database thật ra không bắt buộc điều này.
+
+Nhìn hàng của khách số 2, Trần Minh Khoa: cột `phone` hiển thị **NULL**. NULL nghĩa là "không có giá trị": cửa hàng không biết số điện thoại của khách này. NULL không phải số 0, cũng không phải dòng chữ "NULL". Cột `referred_by` của chị Hà (khách số 1) cũng là NULL vì chị tự tìm đến cửa hàng, không ai giới thiệu. Bài 7 sẽ dành riêng cho NULL vì nó có nhiều điều bất ngờ.
+
+<Callout type="try">
+Hãy bấm Chạy lần nữa. Kết quả không đổi, vì `SELECT` chỉ **đọc** dữ liệu, không bao giờ thay đổi nó. Bạn có thể chạy câu SELECT bao nhiêu lần tùy thích mà không sợ làm hỏng gì.
+</Callout>
+
+## Xem các bảng còn lại
+
+Đổi tên bảng sau `FROM` là xem được bảng khác. Đây là bảng sản phẩm:
+
+<Playground>
+```sql
+SELECT *
+FROM products;
+```
+</Playground>
+
+Bảng có 12 sản phẩm thuộc 4 danh mục: Cà phê, Trà, Bánh và Dụng cụ. Cột `price` là giá bán hiện tại tính bằng đồng: phin nhôm giá 45000 đồng, máy xay cà phê tay giá 450000 đồng. Cột `stock` cho biết còn bao nhiêu cái trong kho. Bình giữ nhiệt 500ml và bánh pía sầu riêng có `stock` bằng 0, tức là đã hết hàng.
+
+Tiếp theo là bảng đơn hàng:
+
+<Playground>
+```sql
+SELECT *
+FROM orders;
+```
+</Playground>
+
+Bảng có 20 đơn. Hãy chú ý cột `customer_id`: đơn số 1 có `customer_id` bằng 1. Bảng đơn hàng không ghi tên khách, mà ghi **mã** của khách. Muốn biết ai đặt đơn số 1, bạn tra bảng `customers` và thấy khách có `id` bằng 1 là Nguyễn Thu Hà.
+
+Vì sao không ghi thẳng tên khách vào đơn? Vì một khách có thể đặt nhiều đơn: chị Hà đã đặt 4 đơn (số 1, 3, 11 và 18). Nếu ghi tên vào từng đơn và một ngày chị đổi tên hiển thị, bạn sẽ phải sửa 4 chỗ, và chỉ cần sót một chỗ là dữ liệu mâu thuẫn. Ghi mã thì thông tin của chị chỉ nằm ở đúng một hàng trong bảng `customers`. Đây là cách các bảng **liên kết** với nhau. Từ bài 16, bạn sẽ học cách nối các bảng lại để trả lời câu hỏi như "ai đặt đơn nào" chỉ bằng một câu lệnh.
+
+Cột `shipped_on` của đơn số 4 là NULL, vì đơn này đã bị hủy nên không bao giờ được gửi đi.
+
+Cuối cùng là bảng chi tiết đơn hàng:
+
+<Playground>
+```sql
+SELECT *
+FROM order_items;
+```
+</Playground>
+
+Bảng có 34 hàng. Mỗi hàng cho biết **một sản phẩm nằm trong một đơn**: đơn nào, sản phẩm nào, bao nhiêu cái, giá mỗi cái lúc đặt. Bảng này không có cột `id`: mỗi hàng được nhận ra bằng **cặp** mã đơn và mã sản phẩm, vì một sản phẩm chỉ xuất hiện một lần trong mỗi đơn. Bài 15 sẽ giải thích kỹ cách định danh này. Đơn số 1 chiếm 2 hàng: 2 cái sản phẩm số 2 (cà phê Robusta) với giá 110000 đồng một cái, và 1 sản phẩm số 1 (phin nhôm) giá 45000 đồng.
+
+Bạn có để ý không: giá Robusta trong bảng `products` hiện là 120000 đồng, nhưng đơn số 1 ghi 110000 đồng. Đó là vì cửa hàng đã tăng giá sau khi đơn này được đặt. Bảng `order_items` lưu giá **tại thời điểm đặt** (`unit_price`), nên dù giá hiện tại thay đổi bao nhiêu lần, số tiền khách đã trả vẫn được ghi lại chính xác. Đây là một quyết định thiết kế bạn sẽ gặp lại khi học về thiết kế bảng.
+
+## Database làm gì khi nhận câu lệnh
+
+Khi bạn bấm Chạy, có một chuỗi việc diễn ra rất nhanh:
+
+1. Database **đọc và kiểm tra** câu lệnh: viết đúng ngữ pháp SQL chưa, bảng `customers` có tồn tại không.
+2. Database **lập kế hoạch**: tìm cách lấy dữ liệu nhanh nhất. Với `SELECT *` trên một bảng nhỏ, kế hoạch đơn giản là đọc lần lượt từng hàng.
+3. Database **thực hiện** kế hoạch và gửi về một bảng kết quả.
+
+Bước 2 là lý do bạn không cần chỉ cho database cách lấy dữ liệu. Với những bảng hàng triệu hàng, database có các kỹ thuật riêng để tìm nhanh, như index (chỉ mục) mà bạn sẽ học ở bài 31. Bạn được hưởng lợi mà không phải viết thêm dòng nào.
+
+Kết quả trả về cũng là một bảng: có cột, có hàng. Điều này nghe hiển nhiên, nhưng rất quan trọng. Vì kết quả của một câu truy vấn cũng là một bảng, sau này bạn có thể dùng nó làm nguyên liệu cho câu truy vấn khác.
+
+<Callout type="note" title="Thứ tự các hàng">
+Với các bảng `customers`, `products` và `orders` ở trên, các hàng tình cờ hiện theo `id` tăng dần. Nhưng ở bảng `order_items`, đơn số 1 hiện sản phẩm 2 trước sản phẩm 1. Đừng dựa vào thứ tự bạn nhìn thấy: nếu không yêu cầu sắp xếp, database được phép trả hàng theo bất kỳ thứ tự nào thuận tiện cho nó. Bài 8 sẽ dạy cách yêu cầu một thứ tự cụ thể.
+</Callout>
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Gõ sai tên bảng">
+Database chỉ tìm đúng tên bạn viết. Thiếu một chữ "s" là đủ để báo lỗi. Bấm Chạy để xem lỗi thật:
+</Callout>
+
+<Playground expect="error">
+```sql
+SELECT *
+FROM customer;
+```
+</Playground>
+
+SQLite trả về lỗi `no such table: customer`, nghĩa là "không có bảng nào tên `customer`". Bảng đúng tên là `customers`. Khi gặp lỗi này, hãy so lại tên bảng với danh sách 4 bảng ở trên. Thông báo lỗi luôn nêu tên mà database không tìm thấy, nên bạn chỉ cần đối chiếu đúng tên đó.
+
+<Callout type="warn" title="Quên từ khóa FROM">
+`SELECT * customers;` thiếu `FROM`, nên database không hiểu `customers` đứng đó để làm gì. SQLite báo `near "customers": syntax error`, nghĩa là lỗi cú pháp ngay gần chữ `customers`. Mỗi câu lấy dữ liệu từ bảng đều cần đủ cả hai phần: `SELECT` để nói lấy gì, `FROM` để nói lấy từ đâu.
+</Callout>
+
+## Tóm tắt
+
+- Database chứa dữ liệu trong các **bảng**. Mỗi **hàng** là một đối tượng, mỗi **cột** là một thuộc tính và được khai báo một kiểu dữ liệu.
+- Các bảng liên kết với nhau qua mã: `orders.customer_id` chứa mã khách trong `customers.id`, thay vì chép lại tên khách.
+- `SELECT * FROM <tên bảng>;` lấy toàn bộ các cột và các hàng của một bảng.
+- `SELECT` chỉ đọc dữ liệu, không thay đổi gì trong database.
+- NULL nghĩa là không có giá trị, khác với số 0 hay dòng chữ "NULL".
+- Không yêu cầu sắp xếp thì thứ tự các hàng trong kết quả không được đảm bảo.
+- Tên bảng phải viết chính xác; sai một ký tự là database báo lỗi "không có bảng".
+
+## Bài tập
+
+Mỗi bài tập có một ô để bạn viết câu lệnh. Bấm **Kiểm tra** để so kết quả của bạn với đáp án. Bị kẹt thì bấm **Gợi ý**, hoặc **Xem lời giải**.
+
+<Exercise hint="Đổi tên bảng sau FROM.">
+Hiển thị toàn bộ bảng sản phẩm (tất cả các cột, tất cả các hàng). Làm đúng rồi thì đọc kết quả: trong những sản phẩm **còn hàng**, sản phẩm nào còn ít nhất trong kho?
+
+```sql
+SELECT *
+FROM products;
+```
+</Exercise>
+
+<Exercise hint="Xem lại bảng mô tả 4 bảng ở phần Dữ liệu của cửa hàng: bảng nào mỗi hàng là một đơn hàng?">
+Hiển thị toàn bộ bảng đơn hàng. Làm đúng rồi thì đọc kết quả và tìm câu trả lời: đơn số 17 đang ở trạng thái nào, và vì sao cột `shipped_on` của nó là NULL?
+
+```sql
+SELECT *
+FROM orders;
+```
+</Exercise>
+
+<Exercise hint="Bảng nào mỗi hàng là một sản phẩm trong một đơn? Tên bảng gồm hai từ nối bằng dấu gạch dưới.">
+Hiển thị toàn bộ bảng chi tiết đơn hàng. Làm đúng rồi thì đọc kết quả: đơn số 13 gồm bao nhiêu sản phẩm khác nhau? Câu hỏi khó hơn: đơn số 13 do khách nào đặt, và khách đó ở thành phố nào? (Gợi ý: bạn sẽ cần xem thêm hai bảng khác, đi theo các mã.)
+
+```sql
+SELECT *
+FROM order_items;
+```
+</Exercise>
+
+<details>
+<summary>Đáp án các câu hỏi đọc kết quả</summary>
+
+- Bài tập 1: trà sen Tây Hồ 100g, còn 8 cái. (Bình giữ nhiệt và bánh pía có `stock` bằng 0, tức đã hết hàng.)
+- Bài tập 2: đơn 17 đang "chờ xác nhận". Cửa hàng chưa xác nhận nên chưa gửi hàng, vì vậy chưa có ngày gửi: `shipped_on` là NULL.
+- Bài tập 3: đơn 13 có 3 hàng trong `order_items`, tức 3 sản phẩm khác nhau (sản phẩm 2, 11 và 1), mỗi sản phẩm 1 cái. Trong bảng `orders`, đơn 13 có `customer_id` bằng 9; trong bảng `customers`, khách số 9 là Ngô Đức Thịnh, ở Hà Nội. Đi theo mã từ bảng này sang bảng khác như vậy chính là việc mà JOIN (bài 16) sẽ làm tự động.
+
+</details>
+
+Ở bài tiếp theo, bạn sẽ học cách chỉ lấy những cột mình cần thay vì luôn lấy tất cả bằng dấu `*`, cùng những quy tắc viết một câu SQL dễ đọc.

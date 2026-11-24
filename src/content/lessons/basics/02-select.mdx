@@ -1,0 +1,197 @@
+---
+title: Chọn cột với SELECT
+description: Chỉ lấy những cột cần dùng theo đúng thứ tự mong muốn, và nắm các quy tắc viết một câu SQL đúng, dễ đọc.
+order: 2
+---
+
+Ở bài trước, bạn đã xem toàn bộ bảng (table) bằng `SELECT *`. Cách đó tiện để làm quen với dữ liệu, nhưng hiếm khi là thứ bạn thật sự cần. Chủ cửa hàng muốn gọi điện chúc mừng khách hàng thì chỉ cần **tên** và **số điện thoại**, không cần email, ngày đăng ký hay người giới thiệu.
+
+Bài này dạy bạn chỉ lấy đúng những cột mình cần, sắp các cột theo thứ tự mình muốn, và nắm những quy tắc viết câu lệnh (statement) SQL mà từ giờ bạn sẽ dùng trong mọi bài.
+
+## Liệt kê các cột cần lấy
+
+Thay dấu `*` bằng tên các cột, cách nhau bởi dấu phẩy:
+
+<Playground>
+```sql
+SELECT name, phone
+FROM customers;
+```
+</Playground>
+
+Kết quả (result set) vẫn có **12 hàng** (row), vì bạn vẫn lấy mọi khách hàng, nhưng giờ chỉ còn **2 cột** (column) thay vì 7. Đây là danh sách gọi điện mà chủ cửa hàng cần. Năm khách có số điện thoại là NULL (Trần Minh Khoa, Võ Thanh Tâm, Bùi Anh Tuấn, Ngô Đức Thịnh, Trịnh Quang Vinh): cửa hàng chưa có số của họ, nên sẽ phải liên hệ qua cách khác.
+
+Hãy để ý cách câu lệnh được chia thành hai dòng: dòng `SELECT` nói **lấy cột nào**, dòng `FROM` nói **từ bảng nào**. Viết như vậy không bắt buộc, nhưng giúp câu lệnh dễ đọc khi nó dài ra. Phần "Quy tắc viết SQL" bên dưới sẽ nói kỹ hơn.
+
+## Thứ tự cột do bạn quyết định
+
+Các cột trong kết quả xuất hiện **theo đúng thứ tự bạn viết sau SELECT**, không phụ thuộc thứ tự cột trong bảng. Trong bảng `customers`, cột `name` đứng trước `city`. Nhưng nếu muốn nhìn thành phố trước, bạn chỉ cần viết `city` trước:
+
+<Playground>
+```sql
+SELECT city, name
+FROM customers;
+```
+</Playground>
+
+Cột `city` giờ đứng đầu. Lướt dọc cột này, bạn đếm được Hà Nội xuất hiện 4 lần: cửa hàng có 4 khách ở Hà Nội. Dữ liệu không đổi, chỉ cách trình bày thay đổi. Các hàng Hà Nội vẫn nằm rải rác, xen giữa các thành phố khác; muốn chúng đứng cạnh nhau, bạn cần sắp xếp kết quả, việc mà bài 8 sẽ dạy.
+
+Bạn cũng có thể lấy cột theo bất kỳ tổ hợp nào. Ví dụ, để xem nhanh tình trạng kho, bạn cần tên sản phẩm, giá và số lượng còn lại:
+
+<Playground>
+```sql
+SELECT name,
+       price,
+       stock
+FROM products;
+```
+</Playground>
+
+Kết quả có 12 hàng và 3 cột. Nhìn cột `stock`, bạn thấy ngay hai sản phẩm đã hết hàng (bình giữ nhiệt 500ml và bánh pía sầu riêng có `stock` bằng 0), và trà sen Tây Hồ chỉ còn 8 hộp. Thông tin này có trong `SELECT *` từ trước, nhưng khi bỏ bớt các cột không cần, nó nổi bật hơn hẳn.
+
+## Vì sao không nên lạm dụng SELECT \*
+
+Viết `SELECT *` nhanh hơn liệt kê từng cột, vậy tại sao người làm nghề lại tránh nó trong câu lệnh dùng lâu dài? Có ba lý do:
+
+1. **Tốn tài nguyên.** Bảng trong thực tế có thể có hàng chục cột, trong đó có cột chứa văn bản dài hoặc hình ảnh. Lấy tất cả nghĩa là database phải đọc và gửi đi nhiều dữ liệu hơn mức cần, chậm hơn khi bảng lớn.
+2. **Dễ vỡ khi bảng thay đổi.** Nếu một ngày ai đó thêm vào bảng `customers` một cột chứa thông tin nhạy cảm, mọi câu `SELECT *` sẽ tự động lấy luôn cột đó, kể cả những câu đang gửi dữ liệu ra ngoài. Ngược lại, câu lệnh liệt kê cột chỉ lấy đúng những gì đã ghi, và nếu một cột nó cần bị đổi tên, database báo lỗi ngay thay vì lặng lẽ trả về dữ liệu khác.
+3. **Khó hiểu ý đồ.** Đọc `SELECT name, phone`, người khác biết ngay câu lệnh dùng để làm gì. Đọc `SELECT *`, họ phải đoán.
+
+`SELECT *` vẫn rất hữu ích khi bạn **khám phá** một bảng lần đầu, như ở bài trước. Quy tắc đơn giản là: dùng `*` để xem, liệt kê cột khi viết câu lệnh để dùng thật. Các bài sau của khóa học sẽ luôn liệt kê cột.
+
+## SELECT không làm thay đổi bảng
+
+Khi bạn chỉ lấy 2 cột, 5 cột còn lại **không hề bị xóa** khỏi bảng. `SELECT` chỉ tạo ra một bảng kết quả mới để bạn xem, còn bảng gốc giữ nguyên.
+
+<Callout type="try">
+Kiểm chứng điều này: trong ô thực hành đầu tiên của bài, đổi câu lệnh thành `SELECT * FROM customers;` rồi bấm Chạy. Bảng vẫn đủ 7 cột, dù trước đó bạn đã chạy câu chỉ lấy 2 cột.
+</Callout>
+
+Bên trong database, việc chọn cột diễn ra như sau: database đọc từng hàng của bảng, rồi từ mỗi hàng chỉ giữ lại những cột bạn yêu cầu, theo thứ tự bạn yêu cầu, để đưa vào kết quả. Thao tác "giữ lại một số cột" này có tên trong lý thuyết database là **phép chiếu** (projection). Bạn không cần nhớ tên này, nhưng hình dung được nó sẽ giúp bạn hiểu các bài sau: SQL luôn **tạo bảng mới từ bảng cũ**, không sửa bảng cũ, trừ khi bạn dùng những câu lệnh dành riêng cho việc sửa dữ liệu (bạn sẽ học ở bài 24 và 25).
+
+## Quy tắc viết SQL
+
+Từ giờ bạn sẽ viết nhiều câu SQL hơn, nên cần nắm vài quy tắc về cách database đọc câu lệnh.
+
+**Từ khóa (keyword) không phân biệt hoa thường.** `SELECT`, `select` và `Select` là như nhau. Khóa học viết hoa từ khóa để dễ phân biệt với tên bảng, tên cột (viết thường). Đây là quy ước được dùng rất rộng rãi, bạn nên làm theo.
+
+**Khoảng trắng và xuống dòng không làm thay đổi ý nghĩa.** Các từ chỉ cần được tách nhau bằng ít nhất một khoảng trắng (viết dính `SELECTname` là lỗi). Ngoài ra, database coi nhiều dấu cách, tab hay xuống dòng đều như một khoảng trắng. Hai câu dưới đây cho cùng một kết quả:
+
+<Playground>
+```sql
+-- Viết trên một dòng, từ khóa chữ thường
+select name, price from products;
+
+-- Mỗi phần một dòng, từ khóa viết hoa: dễ đọc hơn
+SELECT name, price
+FROM products;
+```
+</Playground>
+
+Ô này chạy hai câu lệnh nên trả về **hai bảng kết quả**, mỗi bảng 12 hàng, nội dung giống hệt nhau. Ô này có hai thứ đáng chú ý: dòng chú thích, và dấu `;` giữa hai câu lệnh.
+
+- Dòng bắt đầu bằng `--` là **chú thích** (comment). Database bỏ qua mọi thứ từ `--` đến hết dòng. Chú thích dùng để ghi lại ý định cho người đọc.
+- Dấu `;` ngăn cách các câu lệnh. Khi chỉ có một câu, thiếu `;` ở cuối thường vẫn chạy được, nhưng có nhiều câu thì bắt buộc phải có. Hãy tập thói quen luôn kết thúc câu lệnh bằng `;`.
+
+**Tên cột và tên bảng phải viết đúng chính tả.** Thừa hay thiếu một chữ là lỗi, như bạn sẽ thấy ở phần Lỗi hay gặp. Còn chuyện hoa thường thì SQLite và PostgreSQL không phân biệt ở tên bảng, tên cột: `SELECT NAME FROM CUSTOMERS;` vẫn chạy. Dù vậy, khóa học luôn viết tên bằng chữ thường, đúng như khi được tạo, vì hai lý do: để thống nhất, và vì có database phân biệt hoa thường ở tên bảng (ví dụ MySQL trên một số hệ điều hành, lộ trình MySQL sẽ nói kỹ).
+
+Trong khóa học, mỗi **mệnh đề** (clause), tức mỗi phần bắt đầu bằng một từ khóa như `SELECT` hay `FROM`, nằm trên một dòng mới. Lấy 1–2 cột thì viết trên cùng dòng với `SELECT`. Từ 3 cột trở lên, mỗi cột nằm một dòng, thẳng hàng dưới cột đầu tiên, như ô xem kho (`name`, `price`, `stock`) ở phần trước.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Gõ sai tên cột">
+Viết `citi` thay vì `city`:
+</Callout>
+
+<Playground expect="error">
+```sql
+SELECT name, citi
+FROM customers;
+```
+</Playground>
+
+SQLite báo `no such column: citi`, nghĩa là "không có cột nào tên `citi`" trong bảng đang truy vấn. Cũng như lỗi sai tên bảng ở bài trước, thông báo nêu đúng cái tên database không tìm thấy, bạn chỉ cần so lại với danh sách cột của bảng. PostgreSQL báo cùng ý bằng câu `column "citi" does not exist`.
+
+<Callout type="warn" title="Thừa dấu phẩy trước FROM">
+Đây là một lỗi rất hay gặp, thường xảy ra khi xóa bớt một cột ở cuối danh sách mà quên xóa dấu phẩy:
+</Callout>
+
+<Playground expect="error">
+```sql
+SELECT name,
+       city,
+FROM customers;
+```
+</Playground>
+
+SQLite báo `near "FROM": syntax error`. Dấu phẩy sau `city` báo cho database rằng còn một cột nữa, nhưng thứ đứng tiếp theo lại là từ khóa `FROM`. Lỗi được báo **ở gần `FROM`**, trong khi chỗ sai thật là dấu phẩy ở dòng trên. Hãy nhớ điều này: khi gặp lỗi cú pháp, chỗ sai thật thường nằm **ngay trước** vị trí được báo.
+
+<Callout type="warn" title="Thiếu dấu phẩy giữa các cột">
+`SELECT name city FROM customers;` không báo lỗi, nhưng kết quả chỉ có **một cột**, chứa tên khách hàng, và tiêu đề cột lại là `city`. Database hiểu `city` ở đây là tên mới đặt cho cột `name`. Bạn sẽ học cách đặt tên cột một cách có chủ đích ở bài sau. Còn bây giờ, nếu kết quả có ít cột hơn bạn nghĩ, hãy kiểm tra dấu phẩy.
+</Callout>
+
+## Tóm tắt
+
+- `SELECT cột_1, cột_2 FROM bảng;` chỉ lấy những cột được liệt kê, cách nhau bằng dấu phẩy.
+- Cột trong kết quả theo đúng thứ tự viết sau `SELECT`, không theo thứ tự trong bảng.
+- Dùng `SELECT *` để khám phá dữ liệu; liệt kê cột khi viết câu lệnh dùng thật.
+- `SELECT` tạo bảng kết quả mới, không bao giờ xóa hay sửa cột trong bảng gốc.
+- Từ khóa không phân biệt hoa thường; khoảng trắng và xuống dòng không ảnh hưởng kết quả. `--` mở đầu một dòng chú thích, `;` kết thúc câu lệnh.
+- Lỗi cú pháp thường nằm ngay trước vị trí database báo, điển hình là dấu phẩy thừa trước `FROM`.
+
+## Bài tập
+
+<Exercise hint="Liệt kê hai cột sau SELECT, cách nhau bởi dấu phẩy.">
+Lấy **tên** và **danh mục** của mọi sản phẩm, theo đúng thứ tự cột: `name`, `category`.
+
+```sql
+SELECT name, category
+FROM products;
+```
+</Exercise>
+
+<Exercise hint="Có một dấu phẩy không nên có ở đó. Đọc lại phần Lỗi hay gặp." starter={"SELECT name,\n       email,\n       city,\nFROM customers;\n"}>
+Câu lệnh có sẵn trong ô dưới đây muốn lấy tên, email và thành phố của mọi khách hàng (theo đúng thứ tự đó), nhưng chạy thì báo lỗi. Hãy sửa cho đúng.
+
+```sql
+SELECT name,
+       email,
+       city
+FROM customers;
+```
+</Exercise>
+
+<Exercise hint="Thứ tự cột trong kết quả theo thứ tự bạn viết sau SELECT.">
+Chủ cửa hàng muốn xem danh sách khách theo kiểu "thành phố trước, tên sau, kèm ngày đăng ký". Lấy 3 cột theo đúng thứ tự: `city`, `name`, `joined_on`.
+
+```sql
+SELECT city,
+       name,
+       joined_on
+FROM customers;
+```
+</Exercise>
+
+<Exercise hint="Tra tên cột của bảng products ở bài 1. Thứ tự cột theo đúng thứ tự trong đề.">
+Lập danh sách kiểm kho cho nhân viên: với mỗi sản phẩm, cần **số lượng còn trong kho** trước, rồi tới **tên sản phẩm**, cuối cùng là **danh mục**. Đề bài cố ý không cho sẵn tên cột: hãy tự tìm.
+
+```sql
+SELECT stock,
+       name,
+       category
+FROM products;
+```
+</Exercise>
+
+<Exercise hint="Xem lại bảng các cột của customers ở bài 1: cột lưu mã người giới thiệu tên là gì?">
+Cửa hàng muốn gửi mã giảm giá qua email cho từng khách, và ghi chú khách đó do ai giới thiệu. Lấy 3 cột theo thứ tự: tên khách, email của khách, và mã của người đã giới thiệu khách đó.
+
+```sql
+SELECT name,
+       email,
+       referred_by
+FROM customers;
+```
+</Exercise>
+
+Ở bài tiếp theo, bạn sẽ học cách đặt tên cho cột trong kết quả và tạo ra cột mới bằng cách tính toán từ các cột có sẵn, ví dụ tính giá sau khi giảm 10%.

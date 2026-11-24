@@ -1,0 +1,259 @@
+---
+title: Lọc nhóm với HAVING
+description: Lọc các nhóm sau khi gom bằng HAVING, phân biệt rõ khi nào lọc bằng WHERE và khi nào bằng HAVING, và nắm đủ thứ tự xử lý của một câu SELECT.
+order: 14
+---
+
+Bài 13 kết thúc bằng một câu hỏi: **những khách nào** đã đặt từ 3 đơn trở lên? Bạn đã biết đếm số đơn của mỗi khách bằng `GROUP BY customer_id` và `COUNT(*)`. Phản xạ tự nhiên là thêm điều kiện (condition) vào `WHERE`:
+
+<Playground expect="error">
+```sql
+SELECT customer_id,
+       COUNT(*) AS so_don
+FROM orders
+WHERE COUNT(*) >= 3
+GROUP BY customer_id;
+```
+</Playground>
+
+SQLite báo `misuse of aggregate: COUNT()`, PostgreSQL báo `aggregate functions are not allowed in WHERE`. Bài 12 đã gặp lỗi này với `AVG` và giải thích lý do: `WHERE` kiểm tra **từng hàng** (row) trước khi gom, lúc đó chưa có nhóm nào và chưa ai đếm gì cả. Điều kiện "có từ 3 đơn" là điều kiện về **nhóm**, nên cần một mệnh đề (clause) chạy **sau** khi gom. Mệnh đề đó là `HAVING`.
+
+## HAVING: điều kiện cho từng nhóm
+
+`HAVING` đứng ngay sau `GROUP BY`, viết điều kiện giống `WHERE`, nhưng được kiểm tra cho **từng nhóm** thay vì từng hàng:
+
+<Playground>
+```sql
+SELECT customer_id,
+       COUNT(*) AS so_don
+FROM orders
+GROUP BY customer_id
+HAVING COUNT(*) >= 3
+ORDER BY so_don DESC, customer_id;
+```
+</Playground>
+
+Kết quả (result set) có 3 khách: khách 1 (chị Hà) với 4 đơn, khách 2 và khách 6 mỗi người 3 đơn. Bài 13 đã cho thấy `GROUP BY customer_id` tạo ra 9 nhóm. `HAVING COUNT(*) >= 3` giữ lại những nhóm có từ 3 hàng trở lên và bỏ 6 nhóm còn lại (khách 3, 4, 5, 9 có 2 đơn; khách 7, 11 có 1 đơn). Cũng như `WHERE`, nhóm nào làm điều kiện ra sai **hoặc không xác định** đều bị loại.
+
+Điều kiện trong `HAVING` thường chứa hàm tổng hợp (aggregate function), vì đó là thứ chỉ tồn tại sau khi gom. Hàm đó **không** cần xuất hiện trong `SELECT`, tức không cần là một cột (column) của kết quả. Ví dụ, tìm những khách đã lâu không đặt hàng: đơn gần nhất của họ đặt trước ngày 2025-09-01.
+
+<Playground>
+```sql
+SELECT customer_id,
+       COUNT(*) AS so_don
+FROM orders
+GROUP BY customer_id
+HAVING MAX(ordered_on) < '2025-09-01';
+```
+</Playground>
+
+Chỉ còn khách 7 (Bùi Anh Tuấn), với 1 đơn duy nhất. Với mỗi nhóm, database tính `MAX(ordered_on)` để kiểm tra điều kiện, dù cột đó không hiện trong kết quả. Khách 7 đặt đơn cuối ngày 2025-08-25. Mọi khách khác đều có ít nhất một đơn từ tháng 9 trở đi. Ví dụ khách 5 có đơn đầu từ tháng 7 nhưng lại đặt thêm đơn ngày 2025-11-14, nên `MAX` của khách này vượt mốc và nhóm bị loại.
+
+<Callout type="try">
+Thêm `MAX(ordered_on) AS gan_nhat` vào `SELECT` để xem ngày đơn gần nhất của khách 7. Sau đó đổi mốc thành `'2025-10-01'` và đếm xem còn bao nhiêu khách.
+</Callout>
+
+### So sánh hai hàm tổng hợp với nhau
+
+Điều kiện trong `HAVING` có thể so hai hàm tổng hợp với nhau. Ví dụ, ở thành phố nào có khách chưa để lại số điện thoại? Đó là những thành phố có số khách đã có số điện thoại (`COUNT(phone)`) ít hơn tổng số khách (`COUNT(*)`), dựa trên ba cách đếm của bài 12. Ở đây ta muốn thấy cả tổng số khách lẫn số khách đã có số điện thoại của mỗi thành phố trong bảng (table) `customers`, nên không thể lọc trước bằng `WHERE phone IS NULL`: làm vậy sẽ mất các khách có số khỏi phép đếm.
+
+<Playground>
+```sql
+SELECT city,
+       COUNT(*) AS so_khach,
+       COUNT(phone) AS co_sdt
+FROM customers
+GROUP BY city
+HAVING COUNT(phone) < COUNT(*)
+ORDER BY city;
+```
+</Playground>
+
+Năm trên sáu thành phố có khách thiếu số điện thoại. Hà Nội có 4 khách, 3 khách có số (thiếu Ngô Đức Thịnh). TP.HCM có 3 khách, 2 khách có số. Cần Thơ và Huế mỗi nơi 1 khách, đều chưa có số. Đà Nẵng có 2 khách, 1 khách có số. Hải Phòng bị loại: khách duy nhất ở đây là Hoàng Mai Anh, và chị có số điện thoại, nên `COUNT(phone)` bằng `COUNT(*)` bằng 1.
+
+## WHERE hay HAVING?
+
+Cả hai đều lọc, nhưng ở hai thời điểm khác nhau:
+
+- `WHERE` lọc **hàng**, **trước** khi gom. Hàng bị loại không thuộc nhóm nào, nên không được đếm, không được cộng.
+- `HAVING` lọc **nhóm**, **sau** khi gom. Nó quyết định nhóm nào hiện trong kết quả.
+
+Một câu lệnh (statement) có thể dùng cả hai, và mỗi mệnh đề quyết định một việc khác nhau. Ô dưới đây tìm những tháng có từ 2 đơn trở lên. Câu đầu đếm mọi đơn, câu sau không tính đơn đã hủy:
+
+<Playground>
+```sql
+-- Đếm mọi đơn
+SELECT STRFTIME('%Y-%m', ordered_on) AS thang,
+       COUNT(*) AS so_don
+FROM orders
+GROUP BY thang
+HAVING COUNT(*) >= 2
+ORDER BY thang;
+
+-- Không tính đơn đã hủy
+SELECT STRFTIME('%Y-%m', ordered_on) AS thang,
+       COUNT(*) AS so_don
+FROM orders
+WHERE status <> 'đã hủy'
+GROUP BY thang
+HAVING COUNT(*) >= 2
+ORDER BY thang;
+```
+</Playground>
+
+Bảng kết quả đầu có 7 tháng. Bảng sau chỉ còn 5: tháng 2025-04 và 2025-09 biến mất. Lý do: mỗi tháng đó có 2 đơn, nhưng một trong hai là đơn đã hủy (đơn 4 đặt ngày 2025-04-21, đơn 12 đặt ngày 2025-09-28). `WHERE` loại hai đơn này **trước** khi gom, nên hai tháng đó chỉ còn 1 đơn mỗi tháng và trượt điều kiện của `HAVING`. Các tháng còn lại không có đơn hủy nên số đơn không đổi: tháng 10 vẫn 3 đơn, tháng 11 vẫn 5 đơn.
+
+Câu hỏi "tháng nào có từ 2 đơn **không bị hủy**" cần cả hai: `WHERE` chọn hàng nào được đếm, `HAVING` chọn nhóm nào được hiện.
+
+<Callout type="note" title="Điều kiện trên cột nhóm: đặt ở WHERE">
+Điều kiện chỉ dùng cột nằm trong `GROUP BY`, như `city IN ('Hà Nội', 'Huế')`, đặt ở `WHERE` hay `HAVING` đều cho cùng kết quả. Hãy đặt nó ở `WHERE`: đó là điều kiện về hàng, đặt ở `WHERE` thì đọc rõ ý hơn, và database có thể loại hàng ngay từ đầu. Nhiều database (như PostgreSQL) tự chuyển điều kiện kiểu này từ `HAVING` xuống `WHERE`, nhưng đừng trông cậy vào điều đó. Quy tắc dễ nhớ: điều kiện có hàm tổng hợp thì vào `HAVING`, còn lại vào `WHERE`.
+</Callout>
+
+## Thứ tự xử lý đầy đủ
+
+Với `HAVING`, bạn đã biết mọi mệnh đề cơ bản của một câu `SELECT`. Thứ tự xử lý logic đầy đủ là:
+
+**FROM** → **WHERE** → **GROUP BY** → **HAVING** → **SELECT** → **ORDER BY** → **LIMIT**
+
+| Bước | Làm gì | Đơn vị làm việc |
+|---|---|---|
+| `FROM` | lấy bảng | hàng |
+| `WHERE` | lọc hàng | hàng |
+| `GROUP BY` | chia hàng thành nhóm, gộp mỗi nhóm (tính hàm tổng hợp) | hàng → nhóm |
+| `HAVING` | lọc nhóm | nhóm |
+| `SELECT` | chọn các cột kết quả, đặt bí danh (alias) | nhóm (hoặc hàng nếu không gom) |
+| `ORDER BY` | sắp xếp kết quả | hàng kết quả |
+| `LIMIT` | cắt số hàng kết quả | hàng kết quả |
+
+Thứ tự **viết** thì khác: `SELECT`, `FROM`, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`. Câu dưới đây dùng đủ cả bảy mệnh đề: trong các sản phẩm **còn hàng**, tìm những danh mục có từ 3 sản phẩm trở lên, rồi lấy 3 danh mục tồn kho nhiều nhất.
+
+<Playground>
+```sql
+SELECT category,
+       COUNT(*) AS so_con_hang,
+       SUM(stock) AS ton_kho
+FROM products
+WHERE stock > 0
+GROUP BY category
+HAVING COUNT(*) >= 3
+ORDER BY ton_kho DESC
+LIMIT 3;
+```
+</Playground>
+
+Đi theo từng bước: `WHERE stock > 0` loại bình giữ nhiệt và bánh pía (hết hàng), còn 10 sản phẩm. `GROUP BY` chia thành 4 nhóm: Cà phê 3, Dụng cụ 3 (không còn bình giữ nhiệt), Trà 3, Bánh 1. `HAVING` bỏ nhóm Bánh. `ORDER BY` sắp 3 nhóm còn lại theo tồn kho: Dụng cụ 192, Cà phê 165, Trà 73. `LIMIT 3` giữ cả ba. Nếu bỏ `HAVING`, nhóm Bánh (1 sản phẩm còn hàng, tồn 150 món) sẽ được giữ lại và chiếm chỗ của Trà (73) trong 3 hàng đầu: `HAVING` đã thay đổi kết quả.
+
+Thứ tự này giải thích một khác biệt giữa các database. `HAVING` chạy **trước** `SELECT`, nên theo chuẩn SQL nó không biết bí danh `so_don`. PostgreSQL theo đúng chuẩn: `HAVING so_don >= 3` báo lỗi `column "so_don" does not exist`. SQLite cho phép, giống như nó cho phép bí danh trong `WHERE` ở bài 4. MySQL cũng cho phép bí danh trong `HAVING`, dù vẫn báo lỗi với bí danh trong `WHERE`. Bạn có thể thắc mắc: `GROUP BY` cũng chạy trước `SELECT`, vậy sao bài 13 dùng được `GROUP BY muc_gia` trên PostgreSQL? Đó là ngoại lệ mà bài 13 đã nhắc: PostgreSQL nới lỏng cho `GROUP BY`, nhưng không nới lỏng cho `HAVING`. Khóa học luôn viết lại hàm tổng hợp trong `HAVING` (`HAVING COUNT(*) >= 3`) để chạy được ở mọi nơi.
+
+## HAVING không có GROUP BY
+
+Bài 13 nói một câu có hàm tổng hợp mà không có `GROUP BY` coi cả bảng là **một nhóm**. `HAVING` vẫn dùng được trong trường hợp đó, và lọc chính nhóm duy nhất này:
+
+<Playground>
+```sql
+SELECT COUNT(*) AS so_san_pham
+FROM products
+HAVING COUNT(*) > 100;
+```
+</Playground>
+
+Kết quả có **0 hàng**. Cả bảng có 12 sản phẩm, gom thành một nhóm, nhóm đó trượt điều kiện `COUNT(*) > 100` nên bị bỏ. Hãy so với bài 12: `WHERE category = 'Mỹ phẩm'` loại hết hàng nhưng `COUNT(*)` vẫn trả về 1 hàng với giá trị 0. Hai trường hợp khác nhau ở chỗ: `WHERE` loại **hàng**, nhóm duy nhất vẫn tồn tại (rỗng) và được đếm là 0; còn `HAVING` loại **chính nhóm**, nên không còn gì để hiện. Cách viết này hiếm khi cần trong thực tế, nhưng nó cho thấy rõ `HAVING` làm việc trên nhóm.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Hàm tổng hợp trong WHERE">
+`WHERE COUNT(*) >= 3` báo lỗi trên cả SQLite, PostgreSQL và MySQL, như ô đầu bài. Điều kiện có hàm tổng hợp phải đặt trong `HAVING`, sau `GROUP BY`.
+</Callout>
+
+<Callout type="warn" title="Điều kiện trên cột thường trong HAVING">
+`GROUP BY customer_id HAVING status = 'đã giao'` nghe như "đếm đơn đã giao", nhưng `status` không nằm trong `GROUP BY` và không nằm trong hàm tổng hợp, nên vi phạm quy tắc của bài 13. PostgreSQL báo lỗi `column "orders.status" must appear in the GROUP BY clause…`. SQLite thì chạy, lấy `status` của **một hàng bất kỳ** trong mỗi nhóm để so, và trả về 7 khách với số đơn là **tổng mọi đơn**: một kết quả sai mà trông rất hợp lý. Lọc hàng theo `status` phải đặt ở `WHERE`.
+</Callout>
+
+<Callout type="warn" title="Dùng bí danh trong HAVING">
+`HAVING so_don >= 3` chạy trên SQLite nhưng lỗi trên PostgreSQL. Viết lại hàm tổng hợp: `HAVING COUNT(*) >= 3`.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| Bí danh của `SELECT` trong `HAVING` | có | lỗi | có |
+| Cột không nhóm, không tổng hợp trong `HAVING` | chạy, giá trị bất kỳ | lỗi | lỗi (mặc định MySQL 8) |
+| `HAVING` không có `GROUP BY` | có | có | có |
+| Hàm tổng hợp trong `WHERE` | lỗi | lỗi | lỗi |
+
+## Tóm tắt
+
+- `HAVING` lọc **nhóm** sau khi gom; điều kiện của nó thường chứa hàm tổng hợp, và hàm đó không cần có trong `SELECT`.
+- `WHERE` lọc **hàng** trước khi gom: hàng bị loại không được đếm. Điều kiện có hàm tổng hợp vào `HAVING`, còn lại vào `WHERE`.
+- Đặt điều kiện ở `WHERE` hay `HAVING` có thể đổi kết quả: bỏ đơn hủy bằng `WHERE` làm tháng 4 và tháng 9 không còn đủ 2 đơn.
+- Thứ tự xử lý: FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT. Thứ tự viết: SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT.
+- `HAVING` chạy trước `SELECT`, nên viết lại hàm tổng hợp thay vì dùng bí danh (PostgreSQL lỗi).
+
+## Bài tập
+
+<Exercise hint="Gom theo trạng thái đơn, rồi lọc nhóm theo số đơn.">
+Những **trạng thái đơn** nào có **từ 3 đơn trở lên**? Kết quả gồm 2 cột theo thứ tự: trạng thái, số đơn.
+
+```sql
+SELECT status,
+       COUNT(*) AS so_don
+FROM orders
+GROUP BY status
+HAVING COUNT(*) >= 3;
+```
+</Exercise>
+
+<Exercise hint="Mỗi hàng của order_items là một sản phẩm trong một đơn, nên đếm hàng theo sản phẩm là đếm số đơn.">
+Những sản phẩm nào xuất hiện trong **từ 4 đơn trở lên**? Kết quả gồm 2 cột theo thứ tự: `product_id`, số đơn.
+
+```sql
+SELECT product_id,
+       COUNT(*) AS so_don
+FROM order_items
+GROUP BY product_id
+HAVING COUNT(*) >= 4;
+```
+</Exercise>
+
+<Exercise hint="Chạy thử câu có sẵn và đọc thông báo lỗi. Điều kiện về số khách là điều kiện về nhóm." starter={"SELECT city,\n       COUNT(*) AS so_khach\nFROM customers\nWHERE COUNT(*) >= 2\nGROUP BY city;\n"}>
+Câu lệnh có sẵn trong ô muốn liệt kê các thành phố có **từ 2 khách trở lên**, nhưng báo lỗi. Hãy sửa cho đúng, giữ nguyên 2 cột.
+
+```sql
+SELECT city,
+       COUNT(*) AS so_khach
+FROM customers
+GROUP BY city
+HAVING COUNT(*) >= 2;
+```
+</Exercise>
+
+<Exercise hint="Một điều kiện lọc hàng (trạng thái), một điều kiện lọc nhóm (số đơn). Mỗi điều kiện đặt đúng chỗ của nó.">
+Tìm những khách có **từ 2 đơn đã giao trở lên**. Kết quả gồm 2 cột theo thứ tự: `customer_id`, số đơn đã giao; sắp theo `customer_id` tăng dần.
+
+```sql
+SELECT customer_id,
+       COUNT(*) AS so_don_da_giao
+FROM orders
+WHERE status = 'đã giao'
+GROUP BY customer_id
+HAVING COUNT(*) >= 2
+ORDER BY customer_id;
+```
+</Exercise>
+
+<Exercise hint="Cột tổng số sản phẩm cần mọi hàng của danh mục, nên không lọc giá bằng WHERE được. Nhớ cách COUNT kết hợp với CASE ở bài 12.">
+Tìm những danh mục có **ít nhất 2 sản phẩm giá từ 150000 đồng trở lên**. Kết quả gồm 3 cột theo thứ tự: danh mục, **tổng số sản phẩm** của danh mục, số sản phẩm giá từ 150000 trở lên; sắp theo danh mục tăng dần.
+
+```sql
+SELECT category,
+       COUNT(*) AS so_san_pham,
+       COUNT(CASE WHEN price >= 150000 THEN 1 END) AS so_gia_cao
+FROM products
+GROUP BY category
+HAVING COUNT(CASE WHEN price >= 150000 THEN 1 END) >= 2
+ORDER BY category;
+```
+</Exercise>
+
+Tới đây, mọi câu truy vấn (query) đều chỉ đọc **một bảng**. Bạn đếm được số đơn của khách 1, nhưng muốn biết khách 1 tên gì thì phải mở bảng `customers` ra tra. Bài tiếp theo giải thích vì sao dữ liệu được tách thành nhiều bảng, và các bảng liên kết với nhau bằng khóa chính (primary key), khóa ngoại (foreign key) ra sao, chuẩn bị cho việc nối bảng.

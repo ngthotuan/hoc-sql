@@ -1,0 +1,1345 @@
+{
+  "$comment": "Nguồn sự thật duy nhất cho lộ trình, tiến độ và trang web (src/data/tracks.ts đọc file này). status: planned → drafting → done; 'rewrite' = bài viết trước khi có quy chuẩn, phải viết lại. 'introduces' = từ khóa SQL bài này dạy; script cảnh báo nếu một bài dùng từ khóa chưa được dạy. 'recap' = 1–3 câu tóm tắt điều người học đã nắm sau bài, điền khi bài xong, để các bài sau nối mạch mà không phải đọc lại toàn bộ.",
+  "tracks": {
+    "basics": {
+      "name": "SQL từ con số 0",
+      "summary": "SELECT, lọc, sắp xếp, JOIN, gom nhóm, thiết kế bảng",
+      "level": "Mới bắt đầu",
+      "engine": "sqlite",
+      "dataset": "shop",
+      "requires": []
+    },
+    "postgres": {
+      "name": "PostgreSQL chuyên sâu",
+      "summary": "JSONB, CTE đệ quy, window function, index, MVCC",
+      "level": "Đã biết SQL",
+      "engine": "postgres",
+      "dataset": "shop",
+      "requires": [
+        "basics"
+      ]
+    },
+    "mysql": {
+      "name": "MySQL chuyên sâu",
+      "summary": "InnoDB, collation, index cụm, procedure, khác biệt cú pháp",
+      "level": "Đã biết SQL",
+      "engine": "sqlite",
+      "dataset": "shop",
+      "requires": [
+        "basics"
+      ],
+      "$comment": "MySQL không chạy được trên trình duyệt: phần cú pháp chung chạy bằng SQLite, phần riêng của MySQL trình bày dạng ví dụ tĩnh kèm kết quả mẫu."
+    }
+  },
+  "lessons": [
+    {
+      "id": "basics/01-database-la-gi",
+      "order": 1,
+      "module": "Làm quen",
+      "title": "Database và bảng",
+      "objectives": [
+        "Hiểu database, bảng, hàng, cột là gì qua so sánh với bảng tính",
+        "Biết 4 bảng của dataset cửa hàng và mỗi bảng chứa gì",
+        "Chạy câu lệnh đầu tiên và đọc được bảng kết quả"
+      ],
+      "introduces": [
+        "SELECT",
+        "FROM",
+        "*"
+      ],
+      "status": "done",
+      "recap": "Người học biết database gồm bảng/hàng/cột, mỗi cột khai báo kiểu dữ liệu (SQLite dễ dãi về kiểu, PostgreSQL/MySQL thì không — hẹn bài 26), các bảng liên kết qua mã (orders.customer_id → customers.id; order_items định danh bằng cặp order_id, product_id), và đã thấy unit_price khác price. Biết chạy SELECT * FROM <bảng>; (mỗi mệnh đề một dòng), biết SELECT chỉ đọc, NULL là 'không có giá trị' (hẹn bài 7), thứ tự hàng không được đảm bảo khi không có ORDER BY (hẹn bài 8), và đọc lỗi 'no such table' / 'syntax error'."
+    },
+    {
+      "id": "basics/02-select",
+      "order": 2,
+      "module": "Làm quen",
+      "title": "Chọn cột với SELECT",
+      "objectives": [
+        "Liệt kê đúng những cột cần lấy, theo thứ tự mong muốn",
+        "Hiểu vì sao không nên lạm dụng SELECT *",
+        "Biết câu SELECT không làm thay đổi dữ liệu trong bảng",
+        "Nắm quy tắc viết SQL: từ khóa không phân biệt hoa thường, khoảng trắng, chú thích --, dấu ;"
+      ],
+      "introduces": [],
+      "status": "done",
+      "notes": "Bản nháp hiện tại có cả AS và biểu thức; khi viết lại, chuyển phần đó sang bài 03.",
+      "recap": "Người học biết liệt kê cột sau SELECT (thứ tự cột trong kết quả theo thứ tự viết), vì sao chỉ dùng SELECT * để khám phá, và SELECT không sửa bảng (phép chiếu). Nắm quy tắc viết: từ khóa và tên bảng/cột không phân biệt hoa thường trên SQLite/PostgreSQL (khóa học vẫn viết từ khóa HOA, tên thường), khoảng trắng không đổi nghĩa, chú thích --, ; ngăn cách câu lệnh, mỗi mệnh đề (clause) một dòng, 1–2 cột cùng dòng SELECT, từ 3 cột mỗi cột một dòng. Biết lỗi 'no such column', dấu phẩy thừa trước FROM (chỗ sai nằm trước vị trí báo), và thiếu dấu phẩy tạo bí danh ngầm (hẹn bài 3)."
+    },
+    {
+      "id": "basics/03-bi-danh-bieu-thuc",
+      "order": 3,
+      "module": "Làm quen",
+      "title": "Bí danh và biểu thức",
+      "objectives": [
+        "Đặt bí danh cho cột bằng AS",
+        "Tính toán trong SELECT: + - * / và phép chia số nguyên",
+        "Nối chuỗi bằng ||",
+        "Hiểu cột tính toán chỉ tồn tại trong kết quả"
+      ],
+      "introduces": [
+        "AS",
+        "||"
+      ],
+      "status": "done",
+      "recap": "Người học biết tạo cột bằng biểu thức (+ - * /, hằng số) tính cho từng hàng, đặt bí danh bằng AS (AS có thể bỏ nên thiếu dấu phẩy thành bí danh ngầm; khóa học luôn viết AS), bí danh có dấu cách cần nháy kép, cột tính toán không được lưu mà tính lại mỗi lần chạy. Nắm thứ tự ưu tiên nhân/chia trước cộng/trừ và dùng ngoặc; bẫy chia số nguyên trên SQLite/PostgreSQL (dùng 100000.0 hoặc nhân trước chia sau); nối chuỗi bằng || (MySQL dùng CONCAT), SQL không tự thêm dấu cách; phép tính có NULL ra NULL (hẹn COALESCE bài 7); nháy đơn cho chuỗi, nháy kép cho tên ('city' khác \"city\" trên SQLite). Quy ước: có biểu thức thì mỗi cột một dòng."
+    },
+    {
+      "id": "basics/04-where",
+      "order": 4,
+      "module": "Lọc dữ liệu",
+      "title": "Lọc hàng với WHERE",
+      "objectives": [
+        "Hiểu WHERE kiểm tra từng hàng và giữ lại hàng thỏa điều kiện",
+        "So sánh số, chuỗi và ngày tháng với = <> < > <= >=, chú ý ranh giới > và >=",
+        "Biết so sánh chuỗi phân biệt hoa thường, dấu tiếng Việt và khoảng trắng",
+        "Hiểu thứ tự xử lý FROM → WHERE → SELECT và hệ quả: không dùng bí danh trong WHERE"
+      ],
+      "introduces": [
+        "WHERE"
+      ],
+      "status": "done",
+      "recap": "Người học lọc hàng bằng WHERE (kiểm tra từng hàng), dùng 6 phép so sánh = <> < > <= >= (cẩn thận ranh giới > và >=), biết so sánh chữ trên SQLite/PostgreSQL phân biệt hoa thường, dấu, khoảng trắng (MySQL 8 mặc định không phân biệt hoa thường và dấu — collation, hẹn lộ trình MySQL), kết quả rỗng không phải lỗi. Biết ngày viết đủ YYYY-MM-DD (SQLite lưu ngày như chữ: '2025-1-1' so sai; PostgreSQL/MySQL có DATE thật). Nắm thứ tự xử lý logic FROM → WHERE → SELECT: WHERE lọc được theo cột không có trong SELECT nhưng không dùng bí danh của SELECT (SQLite cho phép, PostgreSQL lỗi). Nháy đơn cho chuỗi; nháy kép là bẫy. Hàng có NULL không qua phép so sánh nào kể cả <> (phone <> … ra 6 thay vì 11, hẹn bài 7). Đã thấy bảng 'Khác nhau giữa các database'."
+    },
+    {
+      "id": "basics/05-and-or-not",
+      "order": 5,
+      "module": "Lọc dữ liệu",
+      "title": "Kết hợp điều kiện: AND, OR, NOT",
+      "objectives": [
+        "Kết hợp nhiều điều kiện bằng AND, OR, NOT",
+        "Hiểu thứ tự ưu tiên AND trước OR và dùng ngoặc để tránh sai",
+        "Lập bảng chân trị đơn giản để kiểm tra điều kiện"
+      ],
+      "introduces": [
+        "AND",
+        "OR",
+        "NOT"
+      ],
+      "status": "done",
+      "recap": "Người học kết hợp điều kiện bằng AND (mọi điều kiện đúng), OR (ít nhất một, bao gồm), NOT (đảo ngược), đọc bảng chân trị, biết định luật De Morgan, và thứ tự ưu tiên: so sánh → NOT → AND → OR — có cả AND và OR thì luôn đặt ngoặc (ví dụ trà/cà phê < 150000: 5 hàng sai vs 3 hàng đúng). Biết viết khoảng thời gian >= A AND < B, chữ 'và' trong câu nói thường là OR, mỗi phía của OR phải là điều kiện đầy đủ (city = 'Hà Nội' OR 'Huế' sai im lặng trên SQLite, lỗi trên PostgreSQL), và NOT/<> loại cả hàng NULL (NOT email = … ra 9 thay vì 11, hẹn bài 7). Quy ước trình bày: AND/OR xuống dòng, canh thẳng mép phải với WHERE."
+    },
+    {
+      "id": "basics/06-in-between-like",
+      "order": 6,
+      "module": "Lọc dữ liệu",
+      "title": "IN, BETWEEN và LIKE",
+      "objectives": [
+        "Viết gọn nhiều điều kiện bằng IN / NOT IN",
+        "Lọc theo khoảng với BETWEEN, hiểu hai đầu được tính, và khi nào nên dùng >= … < … cho thời gian",
+        "Tìm theo mẫu chữ với LIKE, % và _; nhận ra mẫu khớp nhiều hơn ý muốn",
+        "Biết LIKE xử lý hoa thường khác nhau trên SQLite, PostgreSQL (ILIKE), MySQL, nhất là với chữ có dấu"
+      ],
+      "introduces": [
+        "IN",
+        "BETWEEN",
+        "LIKE"
+      ],
+      "status": "done",
+      "recap": "Người học viết gọn danh sách bằng IN / NOT IN (NOT IN loại hàng NULL, hẹn bài 7 và bẫy ở bài 20), khoảng bằng BETWEEN a AND b (tính cả hai đầu, nhỏ trước lớn sau; NOT BETWEEN), và biết với cột có giờ thì >= ngày đầu AND < ngày đầu kỳ sau an toàn hơn (SQLite so ngày như chữ nên '2025-06-30 14:00' nằm ngoài BETWEEN … '2025-06-30'; PostgreSQL/MySQL coi '2025-06-30' là 0 giờ). Dùng LIKE với % (chuỗi bất kỳ) và _ (đúng một ký tự, chỉ đếm ký tự); LIKE không ký tự đại diện phải khớp cả chuỗi; mẫu dễ khớp ngoài ý muốn ('%g' khớp 'riêng', '%Anh%' khớp 'Thanh'). Biết hoa thường trong LIKE khác nhau: SQLite chỉ bỏ qua với chữ không dấu, PostgreSQL phân biệt (ILIKE để bỏ qua), MySQL 8 bỏ qua cả dấu. IN gói phần OR nên tránh lỗi ngoặc của bài 5."
+    },
+    {
+      "id": "basics/07-null",
+      "order": 7,
+      "module": "Lọc dữ liệu",
+      "title": "NULL: giá trị không xác định",
+      "objectives": [
+        "Hiểu NULL nghĩa là không biết, khác 0 và chuỗi rỗng",
+        "Dùng IS NULL / IS NOT NULL, hiểu vì sao = NULL không bao giờ đúng",
+        "Hiểu logic ba giá trị (đúng / sai / không xác định)",
+        "Thay NULL bằng giá trị mặc định với COALESCE"
+      ],
+      "introduces": [
+        "NULL",
+        "IS",
+        "COALESCE"
+      ],
+      "status": "done",
+      "recap": "Người học hiểu NULL là 'không biết / không áp dụng' (khác 0, '' và chữ 'NULL'); dataset có NULL ở phone, email, referred_by, shipped_on. Biết mọi so sánh với NULL (kể cả NULL = NULL) ra 'không xác định' và WHERE loại nó, nên = NULL không tìm được gì — dùng IS NULL / IS NOT NULL. Nắm logic ba giá trị (sai AND gì cũng sai, đúng OR gì cũng đúng, còn lại thường không xác định), giải thích được vì sao <>, NOT, NOT IN âm thầm loại hàng NULL và sửa bằng OR cột IS NULL (đặt ngoặc khi có AND). Biết SELECT không có FROM, khái niệm hàm (function) và COALESCE(a, b, …) để hiển thị giá trị mặc định (chỉ đổi hiển thị); COALESCE trộn kiểu (ngày, chữ) lỗi trên PostgreSQL (hẹn CAST ở bài 10); PostgreSQL dùng true/false thay cho 1/0."
+    },
+    {
+      "id": "basics/08-order-by",
+      "order": 8,
+      "module": "Sắp xếp và giới hạn",
+      "title": "Sắp xếp với ORDER BY",
+      "objectives": [
+        "Sắp xếp tăng/giảm dần với ASC, DESC",
+        "Sắp xếp theo nhiều cột và theo biểu thức/bí danh; hiểu thứ tự xử lý FROM → WHERE → SELECT → ORDER BY",
+        "Biết: không có ORDER BY thì thứ tự hàng không được đảm bảo; hòa nhau thì cần tiêu chí phụ",
+        "Biết NULL đứng đầu hay cuối tùy database và dùng NULLS FIRST/LAST",
+        "Biết sắp xếp chữ tiếng Việt theo mã ký tự (collation C) cho kết quả khác thứ tự từ điển"
+      ],
+      "introduces": [
+        "ORDER BY",
+        "ASC",
+        "DESC",
+        "NULLS FIRST",
+        "NULLS LAST"
+      ],
+      "status": "done",
+      "recap": "Người học sắp xếp bằng ORDER BY (ASC mặc định, DESC; ngày tăng dần là cũ trước), theo nhiều cột (cột sau chỉ dùng khi cột trước hòa), theo biểu thức và bí danh (PostgreSQL: bí danh phải đứng một mình), và theo cột không có trong SELECT. Nắm thứ tự xử lý FROM → WHERE → SELECT → ORDER BY (cột không chọn chưa bị bỏ tới khi sắp xong). Biết hàng hòa nhau không có thứ tự đảm bảo (phin nhôm/máy xay khác thứ tự giữa SQLite và PostgreSQL) nên thêm tiêu chí phụ; NULL: SQLite đầu khi ASC/cuối khi DESC, PostgreSQL ngược lại, dùng NULLS FIRST/LAST (MySQL không có). Hiểu chữ có dấu sắp theo mã Unicode trong ô thực hành (Huế trước Hà Nội, Đà Nẵng sau TP.HCM, Nguyễn trước Ngô) — khác thứ tự từ điển; collation (hẹn lộ trình MySQL). Thứ tự viết mệnh đề cố định: SELECT, FROM, WHERE, ORDER BY."
+    },
+    {
+      "id": "basics/09-limit-distinct",
+      "order": 9,
+      "module": "Sắp xếp và giới hạn",
+      "title": "LIMIT, OFFSET và DISTINCT",
+      "objectives": [
+        "Lấy N hàng đầu tiên với LIMIT, phân trang với OFFSET",
+        "Hiểu LIMIT không có ORDER BY cho kết quả không ổn định",
+        "Loại hàng trùng lặp bằng DISTINCT trên một hoặc nhiều cột"
+      ],
+      "introduces": [
+        "LIMIT",
+        "OFFSET",
+        "DISTINCT"
+      ],
+      "status": "done",
+      "recap": "Người học dùng LIMIT n (đứng sau ORDER BY, xử lý sau cùng cùng OFFSET) để lấy N hàng đầu, biết LIMIT không ORDER BY chỉ để xem thử, và hòa nhau ở ranh giới làm kết quả không ổn định (2 sản phẩm stock 0) — cần tiêu chí phụ hoặc xem lại câu hỏi. Phân trang LIMIT n OFFSET (k-1)*n, có tiêu chí phụ id; OFFSET lớn thì chậm (biết ý tưởng phân trang theo mốc). Dùng SELECT DISTINCT trên một hoặc nhiều cột (xét toàn bộ các cột), DISTINCT gộp các NULL thành một, không dùng DISTINCT để che lỗi trùng lặp. Biết: PostgreSQL không có LIMIT m, n nhưng có FETCH FIRST và nhận OFFSET trước LIMIT; PostgreSQL cấm ORDER BY cột không có trong SELECT khi có DISTINCT."
+    },
+    {
+      "id": "basics/10-ham-xu-ly",
+      "order": 10,
+      "module": "Biến đổi dữ liệu",
+      "title": "Hàm xử lý chuỗi, số và ngày",
+      "objectives": [
+        "Dùng hàm chuỗi: UPPER, LOWER, LENGTH, SUBSTR, REPLACE, TRIM",
+        "Dùng hàm số: ROUND, ABS",
+        "Lấy năm, tháng từ ngày; biết mỗi database có hàm ngày khác nhau",
+        "Ép kiểu với CAST"
+      ],
+      "introduces": [
+        "UPPER",
+        "LOWER",
+        "LENGTH",
+        "SUBSTR",
+        "REPLACE",
+        "TRIM",
+        "ROUND",
+        "ABS",
+        "CAST",
+        "STRFTIME",
+        "INTEGER",
+        "TEXT",
+        "REAL"
+      ],
+      "status": "done",
+      "recap": "Người học dùng hàm trong SELECT/WHERE/ORDER BY (tính cho từng hàng, nhận NULL thường trả NULL): SUBSTR(s, vị_trí, n) đếm từ 1, LENGTH đếm ký tự (MySQL LENGTH đếm byte), REPLACE, TRIM, UPPER/LOWER (SQLite chỉ đổi chữ không dấu: 'Hà NộI'; PostgreSQL đúng). Số: ROUND(x, n), ABS (độ lệch); ROUND không cứu phép chia số nguyên; sai số số thực (ROUND(1.65,1) = 1.6 trên SQLite; tiền nên lưu số nguyên/DECIMAL, hẹn bài 26). Ngày trên SQLite: STRFTIME('%Y'/'%m'/'%d', d) trả về chuỗi (so với số ra 0 hàng), PostgreSQL dùng EXTRACT, MySQL YEAR. CAST(x AS INTEGER/TEXT/REAL) đổi kiểu; COALESCE(CAST(shipped_on AS TEXT), 'chưa gửi') chạy trên cả hai engine; PostgreSQL không nhận ROUND(real, n). Hàm trên cột trong WHERE cản index (hẹn bài 31), khoảng ngày nên viết >= … AND < …."
+    },
+    {
+      "id": "basics/11-case",
+      "order": 11,
+      "module": "Biến đổi dữ liệu",
+      "title": "Rẽ nhánh với CASE",
+      "objectives": [
+        "Phân loại dữ liệu bằng CASE WHEN … THEN … ELSE … END",
+        "Hiểu CASE dừng ở nhánh đúng đầu tiên",
+        "Dùng CASE trong SELECT và ORDER BY"
+      ],
+      "introduces": [
+        "CASE",
+        "WHEN",
+        "THEN",
+        "ELSE",
+        "END"
+      ],
+      "status": "done",
+      "recap": "Người học viết CASE WHEN điều_kiện THEN giá_trị … ELSE … END (một biểu thức, tính cho từng hàng) trong SELECT kèm AS và trong ORDER BY. Biết CASE dừng ở nhánh đúng đầu tiên: với khoảng lồng nhau viết nhánh hẹp trước (đảo nhánh làm nhãn 'rẻ' biến mất, không có cảnh báo); thiếu ELSE thì hàng không khớp nhận NULL. WHEN theo logic ba giá trị nên kiểm NULL bằng IS NULL; dạng rút gọn CASE cột WHEN giá_trị so bằng = nên WHEN NULL không bao giờ khớp. ORDER BY CASE … END sắp theo thứ tự tùy ý và đặt NULL đầu/cuối giống nhau trên mọi database (thay NULLS FIRST). Các nhánh nên cùng kiểu: chữ lẫn số chạy trên SQLite, lỗi trên PostgreSQL, sửa bằng CAST(… AS TEXT); bí danh bên trong CASE ở ORDER BY lỗi trên PostgreSQL. Biết MySQL có IF() cho hai nhánh."
+    },
+    {
+      "id": "basics/12-ham-tong-hop",
+      "order": 12,
+      "module": "Tổng hợp dữ liệu",
+      "title": "Hàm tổng hợp",
+      "objectives": [
+        "Đếm, tính tổng, trung bình, nhỏ nhất, lớn nhất trên cả bảng",
+        "Phân biệt COUNT(*), COUNT(cột) và COUNT(DISTINCT cột)",
+        "Hiểu hàm tổng hợp bỏ qua NULL"
+      ],
+      "introduces": [
+        "COUNT",
+        "SUM",
+        "AVG",
+        "MIN",
+        "MAX"
+      ],
+      "status": "done",
+      "recap": "Người học dùng hàm tổng hợp COUNT, SUM, AVG, MIN, MAX để gộp mọi hàng còn lại sau WHERE thành một hàng (khác hàm của bài 10 tính từng hàng); bên trong có thể là biểu thức (SUM(quantity * unit_price)), bọc ngoài được bằng ROUND, không lồng hàm tổng hợp vào nhau. Phân biệt COUNT(*) (hàng), COUNT(cột) (giá trị không NULL), COUNT(DISTINCT cột) (giá trị khác nhau, bỏ NULL: referred_by ra 5 dù SELECT DISTINCT ra 6), và COUNT(*) khác SUM(quantity). Biết SUM/AVG/MIN/MAX bỏ qua NULL (AVG chia cho số giá trị không NULL; muốn coi NULL là 0 thì COALESCE bên trong), COUNT(CASE WHEN … THEN 1 END) để đếm có điều kiện; không còn hàng thì COUNT ra 0, các hàm khác NULL. MIN/MAX dùng được cho chữ và ngày nhưng không cho biết hàng nào. Lỗi: trộn cột thường với hàm tổng hợp (SQLite chạy, PostgreSQL lỗi; dùng ORDER BY … LIMIT 1), hàm tổng hợp trong WHERE (lỗi, hẹn bài 14 và truy vấn con bài 19), tự chia SUM/COUNT (chia số nguyên). PostgreSQL đặt tên cột count/sum nên luôn đặt bí danh."
+    },
+    {
+      "id": "basics/13-group-by",
+      "order": 13,
+      "module": "Tổng hợp dữ liệu",
+      "title": "Gom nhóm với GROUP BY",
+      "objectives": [
+        "Tính tổng hợp theo từng nhóm",
+        "Hiểu quy tắc: cột trong SELECT phải nằm trong GROUP BY hoặc trong hàm tổng hợp",
+        "Gom nhóm theo nhiều cột và theo biểu thức"
+      ],
+      "introduces": [
+        "GROUP BY"
+      ],
+      "status": "done",
+      "recap": "Người học dùng GROUP BY cột để chia hàng thành nhóm (chia chồng → thu gọn mỗi chồng thành một hàng) và tính hàm tổng hợp riêng từng nhóm; không GROUP BY = cả bảng một nhóm (luôn ra 1 hàng), có GROUP BY mà không còn hàng thì 0 hàng. Nắm quy tắc: cột trong SELECT phải nằm trong GROUP BY hoặc trong hàm tổng hợp (SQLite chọn giá trị bất kỳ, PostgreSQL/MySQL 8 lỗi; PostgreSQL nới lỏng khi gom theo khóa chính); quên GROUP BY trên SQLite ra 1 hàng sai. Gom theo nhiều cột (mỗi tổ hợp có thật một nhóm), theo biểu thức (STRFTIME, CASE) và theo bí danh (chạy trên cả ba database). NULL gom thành một nhóm; tổ hợp không có hàng thì không có nhóm (khách chưa có đơn không hiện số 0, hẹn LEFT JOIN bài 17). Thứ tự xử lý FROM → WHERE → GROUP BY → SELECT → ORDER BY → LIMIT; GROUP BY không hứa thứ tự (SQLite và PostgreSQL khác nhau)."
+    },
+    {
+      "id": "basics/14-having",
+      "order": 14,
+      "module": "Tổng hợp dữ liệu",
+      "title": "Lọc nhóm với HAVING",
+      "objectives": [
+        "Lọc nhóm sau khi gom bằng HAVING",
+        "Phân biệt WHERE (lọc hàng trước khi gom) và HAVING (lọc nhóm sau khi gom)",
+        "Nắm thứ tự xử lý logic: FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT"
+      ],
+      "introduces": [
+        "HAVING"
+      ],
+      "status": "done",
+      "recap": "Người học lọc nhóm bằng HAVING (đứng sau GROUP BY, điều kiện thường chứa hàm tổng hợp, kể cả hàm không có trong SELECT, ví dụ HAVING MAX(ordered_on) < …, và so hai hàm tổng hợp như COUNT(phone) < COUNT(*)). Phân biệt WHERE lọc hàng trước khi gom (hàng bị loại không được đếm: bỏ đơn hủy làm tháng 4 và 9 không đủ 2 đơn) và HAVING lọc nhóm sau khi gom; hàm tổng hợp trong WHERE lỗi; điều kiện không có hàm tổng hợp đặt ở WHERE; cột không nhóm trong HAVING thì SQLite cho kết quả sai, PostgreSQL lỗi. Nắm thứ tự xử lý đầy đủ FROM → WHERE → GROUP BY (gộp, tính hàm tổng hợp) → HAVING → SELECT → ORDER BY → LIMIT và thứ tự viết SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT. Bí danh trong HAVING: SQLite/MySQL nhận, PostgreSQL lỗi (khác GROUP BY) nên viết lại hàm tổng hợp. HAVING không GROUP BY lọc nhóm duy nhất: trượt thì 0 hàng."
+    },
+    {
+      "id": "basics/15-khoa-va-quan-he",
+      "order": 15,
+      "module": "Nhiều bảng",
+      "title": "Khóa chính, khóa ngoại và quan hệ",
+      "objectives": [
+        "Hiểu khóa chính định danh mỗi hàng",
+        "Hiểu khóa ngoại liên kết các bảng",
+        "Đọc sơ đồ quan hệ của dataset: một–nhiều, nhiều–nhiều qua bảng trung gian",
+        "Hiểu vì sao dữ liệu được tách ra nhiều bảng"
+      ],
+      "introduces": [],
+      "status": "done",
+      "notes": "Cần một sơ đồ quan hệ (SVG) của 4 bảng shop.",
+      "recap": "Người học hiểu khóa chính xác định duy nhất mỗi hàng (không trùng, không NULL; thường là id tự đặt vì tên có thể trùng/đổi/thiếu; 'hiện không trùng' khác 'được bảo đảm không trùng'), khóa ghép (order_items: cặp order_id, product_id). Khóa ngoại trỏ tới khóa chính của bảng khác hoặc chính bảng đó (referred_by), có thể NULL nếu cột cho phép; database từ chối dữ liệu mồ côi (SQLite mặc định không kiểm tra, ô thực hành bật PRAGMA foreign_keys). Đọc được sơ đồ quan hệ 4 bảng (ShopDiagram): một–nhiều (phía nhiều giữ khóa ngoại), tự tham chiếu, nhiều–nhiều qua bảng trung gian order_items (nơi chứa quantity, unit_price của từng cặp). Biết vì sao tách bảng (tránh lặp, sửa thiếu chỗ, chỗ cho thông tin độc lập) và cái giá là phải nối bảng; đã tự đi theo khóa ngoại bằng hai câu truy vấn (đơn 14 → khách 3), biết cách viết bảng.cột. Lỗi: nhầm orders.id với customer_id; tưởng cột không trùng là khóa chính; quên khóa ghép."
+    },
+    {
+      "id": "basics/16-inner-join",
+      "order": 16,
+      "module": "Nhiều bảng",
+      "title": "Nối bảng với INNER JOIN",
+      "objectives": [
+        "Nối hai bảng theo điều kiện ON",
+        "Đặt bí danh cho bảng và ghi rõ cột thuộc bảng nào",
+        "Hiểu INNER JOIN chỉ giữ cặp hàng khớp nhau, và số hàng kết quả có thể tăng"
+      ],
+      "introduces": [
+        "JOIN",
+        "INNER JOIN",
+        "ON"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "basics/17-outer-join",
+      "order": 17,
+      "module": "Nhiều bảng",
+      "title": "LEFT, RIGHT và FULL JOIN",
+      "objectives": [
+        "Giữ mọi hàng bên trái với LEFT JOIN, hiểu NULL xuất hiện ở đâu",
+        "Tìm hàng không có cặp (khách chưa đặt đơn nào)",
+        "Biết RIGHT JOIN, FULL JOIN và mức hỗ trợ ở từng database",
+        "Tránh lỗi đặt điều kiện vào WHERE làm LEFT JOIN thành INNER JOIN"
+      ],
+      "introduces": [
+        "LEFT JOIN",
+        "RIGHT JOIN",
+        "FULL JOIN",
+        "OUTER"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "basics/18-join-nhieu-bang",
+      "order": 18,
+      "module": "Nhiều bảng",
+      "title": "Nối nhiều bảng và tự nối",
+      "objectives": [
+        "Nối 3–4 bảng để trả lời câu hỏi kinh doanh (ai mua gì, bao nhiêu tiền)",
+        "Kết hợp JOIN với GROUP BY",
+        "Tự nối một bảng với chính nó (self join)",
+        "Nhận biết và tránh nhân bản hàng ngoài ý muốn"
+      ],
+      "introduces": [
+        "CROSS JOIN"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "basics/19-truy-van-con",
+      "order": 19,
+      "module": "Truy vấn lồng nhau",
+      "title": "Truy vấn con",
+      "objectives": [
+        "Dùng truy vấn con trả về một giá trị trong WHERE và SELECT",
+        "Dùng truy vấn con trả về danh sách với IN",
+        "Dùng truy vấn con trong FROM như một bảng tạm"
+      ],
+      "introduces": [],
+      "status": "planned"
+    },
+    {
+      "id": "basics/20-exists",
+      "order": 20,
+      "module": "Truy vấn lồng nhau",
+      "title": "EXISTS và truy vấn con tương quan",
+      "objectives": [
+        "Hiểu truy vấn con tương quan chạy lại cho mỗi hàng bên ngoài",
+        "Dùng EXISTS / NOT EXISTS",
+        "Hiểu bẫy NOT IN khi danh sách có NULL"
+      ],
+      "introduces": [
+        "EXISTS"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "basics/21-phep-tap-hop",
+      "order": 21,
+      "module": "Truy vấn lồng nhau",
+      "title": "UNION, INTERSECT, EXCEPT",
+      "objectives": [
+        "Ghép kết quả nhiều câu truy vấn với UNION và UNION ALL",
+        "Lấy phần chung và phần khác nhau với INTERSECT, EXCEPT",
+        "Hiểu yêu cầu cùng số cột và kiểu dữ liệu tương thích"
+      ],
+      "introduces": [
+        "UNION",
+        "ALL",
+        "INTERSECT",
+        "EXCEPT"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "basics/22-cte",
+      "order": 22,
+      "module": "Truy vấn nâng cao",
+      "title": "CTE với WITH",
+      "objectives": [
+        "Đặt tên cho truy vấn trung gian bằng WITH",
+        "Viết lại truy vấn con lồng nhiều tầng thành các bước dễ đọc",
+        "Dùng nhiều CTE nối tiếp nhau"
+      ],
+      "introduces": [
+        "WITH"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "basics/23-window-function",
+      "order": 23,
+      "module": "Truy vấn nâng cao",
+      "title": "Window function nhập môn",
+      "objectives": [
+        "Hiểu window function tính trên nhóm hàng mà không gộp hàng",
+        "Đánh số với ROW_NUMBER, xếp hạng với RANK, DENSE_RANK",
+        "Chia nhóm với PARTITION BY và tính tổng lũy kế"
+      ],
+      "introduces": [
+        "OVER",
+        "PARTITION BY",
+        "ROW_NUMBER",
+        "RANK",
+        "DENSE_RANK"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "basics/24-insert",
+      "order": 24,
+      "module": "Thay đổi dữ liệu",
+      "title": "Thêm dữ liệu với INSERT",
+      "objectives": [
+        "Thêm một hàng và nhiều hàng",
+        "Luôn ghi rõ danh sách cột",
+        "Thêm từ kết quả câu SELECT (INSERT … SELECT)",
+        "Đọc hiểu lỗi vi phạm ràng buộc khi thêm"
+      ],
+      "introduces": [
+        "INSERT",
+        "INTO",
+        "VALUES"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "basics/25-update-delete",
+      "order": 25,
+      "module": "Thay đổi dữ liệu",
+      "title": "Sửa và xóa với UPDATE, DELETE",
+      "objectives": [
+        "Sửa dữ liệu với UPDATE … SET … WHERE",
+        "Xóa hàng với DELETE",
+        "Thói quen an toàn: chạy SELECT với cùng WHERE trước khi sửa/xóa",
+        "Hiểu khóa ngoại ngăn xóa hàng đang được tham chiếu"
+      ],
+      "introduces": [
+        "UPDATE",
+        "SET",
+        "DELETE"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "basics/26-create-table",
+      "order": 26,
+      "module": "Thiết kế bảng",
+      "title": "Tạo bảng và kiểu dữ liệu",
+      "objectives": [
+        "Tạo bảng với CREATE TABLE",
+        "Chọn kiểu dữ liệu phù hợp: số nguyên, số thập phân, chuỗi, ngày, boolean",
+        "Biết SQLite linh hoạt kiểu dữ liệu còn PostgreSQL/MySQL chặt chẽ hơn",
+        "Lưu tiền bằng số nguyên hoặc DECIMAL, không dùng số thực"
+      ],
+      "introduces": [
+        "CREATE TABLE",
+        "DATE",
+        "DECIMAL"
+      ],
+      "status": "planned",
+      "notes": "INTEGER/TEXT/REAL đã được giới thiệu ở bài 10 như kiểu đích của CAST; bài này dạy chúng như kiểu của cột."
+    },
+    {
+      "id": "basics/27-rang-buoc",
+      "order": 27,
+      "module": "Thiết kế bảng",
+      "title": "Ràng buộc dữ liệu",
+      "objectives": [
+        "Dùng PRIMARY KEY, NOT NULL, UNIQUE, CHECK, DEFAULT",
+        "Khai báo FOREIGN KEY … REFERENCES và hành vi ON DELETE",
+        "Hiểu ràng buộc là tuyến phòng thủ cuối cùng cho dữ liệu đúng"
+      ],
+      "introduces": [
+        "PRIMARY KEY",
+        "UNIQUE",
+        "CHECK",
+        "DEFAULT",
+        "FOREIGN KEY",
+        "REFERENCES",
+        "CASCADE"
+      ],
+      "status": "planned",
+      "notes": "Ràng buộc NOT NULL được dạy ở đây nhưng không theo dõi như từ khóa riêng (trùng chữ với IS NOT NULL của bài 7). Bài 15 đã hẹn: (1) SQLite mặc định không kiểm tra khóa ngoại, cần PRAGMA foreign_keys = ON (ô thực hành đã bật sẵn trong sqlite.worker.ts); (2) SQLite cho phép NULL trong khóa chính không phải INTEGER PRIMARY KEY nếu không khai báo NOT NULL (lỗi cũ giữ để tương thích)."
+    },
+    {
+      "id": "basics/28-alter-drop",
+      "order": 28,
+      "module": "Thiết kế bảng",
+      "title": "Thay đổi và xóa bảng",
+      "objectives": [
+        "Thêm, đổi tên cột với ALTER TABLE",
+        "Xóa bảng với DROP TABLE, hiểu khác biệt với DELETE",
+        "Biết thay đổi cấu trúc trên bảng lớn cần cân nhắc"
+      ],
+      "introduces": [
+        "ALTER TABLE",
+        "ADD COLUMN",
+        "RENAME",
+        "DROP TABLE",
+        "IF EXISTS"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "basics/29-chuan-hoa",
+      "order": 29,
+      "module": "Thiết kế bảng",
+      "title": "Chuẩn hóa dữ liệu",
+      "objectives": [
+        "Nhận diện dữ liệu trùng lặp và hệ quả khi cập nhật",
+        "Đưa một bảng tính phẳng về dạng chuẩn 1NF, 2NF, 3NF từng bước",
+        "Biết khi nào phi chuẩn hóa có chủ đích là hợp lý"
+      ],
+      "introduces": [],
+      "status": "planned"
+    },
+    {
+      "id": "basics/30-transaction",
+      "order": 30,
+      "module": "Vận hành",
+      "title": "Transaction",
+      "objectives": [
+        "Gom nhiều câu lệnh thành một đơn vị với BEGIN, COMMIT, ROLLBACK",
+        "Hiểu ACID qua ví dụ đặt hàng: trừ kho và tạo đơn phải cùng thành công",
+        "Biết transaction song song sẽ học sâu ở lộ trình PostgreSQL/MySQL"
+      ],
+      "introduces": [
+        "BEGIN",
+        "COMMIT",
+        "ROLLBACK",
+        "TRANSACTION"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "basics/31-index",
+      "order": 31,
+      "module": "Vận hành",
+      "title": "Index và tốc độ truy vấn",
+      "objectives": [
+        "Hiểu index như mục lục của cuốn sách",
+        "Tạo index và xem database có dùng nó không (EXPLAIN QUERY PLAN)",
+        "Biết cái giá của index: tốn chỗ, chậm khi ghi"
+      ],
+      "introduces": [
+        "CREATE INDEX",
+        "INDEX",
+        "EXPLAIN",
+        "QUERY PLAN"
+      ],
+      "status": "planned",
+      "notes": "Cần dataset lớn hơn (vài chục nghìn hàng sinh bằng truy vấn đệ quy hoặc script) để thấy khác biệt."
+    },
+    {
+      "id": "basics/32-view",
+      "order": 32,
+      "module": "Vận hành",
+      "title": "View",
+      "objectives": [
+        "Lưu một câu truy vấn thành view và truy vấn view như bảng",
+        "Hiểu view không lưu dữ liệu",
+        "Dùng view để đơn giản hóa báo cáo và giới hạn quyền xem"
+      ],
+      "introduces": [
+        "CREATE VIEW",
+        "VIEW"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "basics/33-du-an-bao-cao",
+      "order": 33,
+      "module": "Tổng kết",
+      "title": "Dự án: báo cáo bán hàng",
+      "objectives": [
+        "Tự trả lời 8–10 câu hỏi kinh doanh thật trên dataset",
+        "Kết hợp JOIN, GROUP BY, CTE, window function trong một báo cáo",
+        "Tự kiểm tra kết quả bằng cách đối chiếu nhiều cách viết"
+      ],
+      "introduces": [],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/01-gioi-thieu",
+      "order": 1,
+      "module": "Nền tảng",
+      "title": "Làm quen PostgreSQL",
+      "objectives": [
+        "Biết PostgreSQL là gì, mô hình client–server, công cụ psql",
+        "So sánh nhanh với SQLite đã dùng ở lộ trình cơ bản",
+        "Chạy PostgreSQL thật trên trình duyệt"
+      ],
+      "introduces": [
+        "VERSION",
+        "CURRENT_DATE"
+      ],
+      "status": "rewrite"
+    },
+    {
+      "id": "postgres/02-kieu-du-lieu",
+      "order": 2,
+      "module": "Nền tảng",
+      "title": "Kiểu dữ liệu trong PostgreSQL",
+      "objectives": [
+        "Chọn đúng kiểu số: integer, bigint, numeric; tránh float cho tiền",
+        "text và varchar(n): khác nhau thế nào trong PostgreSQL",
+        "boolean, date, timestamp, timestamptz, interval",
+        "Ép kiểu bằng :: và CAST"
+      ],
+      "introduces": [
+        "NUMERIC",
+        "VARCHAR",
+        "BOOLEAN",
+        "TIMESTAMP",
+        "TIMESTAMPTZ",
+        "INTERVAL",
+        "BIGINT",
+        "::"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/03-identity-uuid",
+      "order": 3,
+      "module": "Nền tảng",
+      "title": "Sinh khóa: IDENTITY, SEQUENCE, UUID",
+      "objectives": [
+        "Dùng GENERATED … AS IDENTITY thay cho SERIAL",
+        "Hiểu sequence hoạt động thế nào, vì sao số có thể bị nhảy",
+        "Khi nào dùng UUID làm khóa chính"
+      ],
+      "introduces": [
+        "GENERATED",
+        "IDENTITY",
+        "SERIAL",
+        "SEQUENCE",
+        "NEXTVAL",
+        "UUID",
+        "GEN_RANDOM_UUID"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/04-schema",
+      "order": 4,
+      "module": "Nền tảng",
+      "title": "Schema và search_path",
+      "objectives": [
+        "Tổ chức bảng theo schema",
+        "Hiểu search_path quyết định PostgreSQL tìm bảng ở đâu",
+        "Quy ước đặt tên và trích dẫn tên bằng nháy kép"
+      ],
+      "introduces": [
+        "CREATE SCHEMA",
+        "SEARCH_PATH",
+        "SHOW"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/05-ngay-gio",
+      "order": 5,
+      "module": "Kiểu dữ liệu mạnh",
+      "title": "Ngày giờ và múi giờ",
+      "objectives": [
+        "timestamp và timestamptz: lưu gì, hiển thị gì",
+        "Tính toán với interval, date_trunc, extract",
+        "Sinh chuỗi ngày bằng generate_series để lấp ngày trống trong báo cáo"
+      ],
+      "introduces": [
+        "DATE_TRUNC",
+        "EXTRACT",
+        "GENERATE_SERIES",
+        "AT TIME ZONE",
+        "NOW"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/06-array",
+      "order": 6,
+      "module": "Kiểu dữ liệu mạnh",
+      "title": "Mảng (ARRAY)",
+      "objectives": [
+        "Lưu và truy vấn cột kiểu mảng",
+        "Tìm phần tử với ANY và @>",
+        "Trải mảng thành hàng với unnest, gom hàng thành mảng với array_agg",
+        "Khi nào nên dùng bảng riêng thay cho mảng"
+      ],
+      "introduces": [
+        "ARRAY",
+        "ANY",
+        "UNNEST",
+        "ARRAY_AGG",
+        "@>"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/07-jsonb-co-ban",
+      "order": 7,
+      "module": "Kiểu dữ liệu mạnh",
+      "title": "JSONB cơ bản",
+      "objectives": [
+        "Khác nhau giữa json và jsonb",
+        "Đọc dữ liệu với -> và ->>, lọc với @> và ?",
+        "Tạo JSON từ bảng với jsonb_build_object, jsonb_agg"
+      ],
+      "introduces": [
+        "JSONB",
+        "->",
+        "->>",
+        "?",
+        "JSONB_BUILD_OBJECT",
+        "JSONB_AGG"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/08-jsonb-nang-cao",
+      "order": 8,
+      "module": "Kiểu dữ liệu mạnh",
+      "title": "JSONB nâng cao",
+      "objectives": [
+        "Cập nhật một phần JSON với jsonb_set và ||",
+        "Trải JSON thành hàng với jsonb_array_elements, jsonb_each",
+        "JSON path với jsonb_path_query",
+        "Thiết kế: khi nào JSONB, khi nào cột thường"
+      ],
+      "introduces": [
+        "JSONB_SET",
+        "JSONB_ARRAY_ELEMENTS",
+        "JSONB_EACH",
+        "JSONB_PATH_QUERY"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/09-upsert-returning",
+      "order": 9,
+      "module": "Ghi dữ liệu",
+      "title": "UPSERT và RETURNING",
+      "objectives": [
+        "Thêm hoặc cập nhật với INSERT … ON CONFLICT",
+        "Dùng EXCLUDED để lấy giá trị định thêm",
+        "Lấy lại dữ liệu vừa ghi với RETURNING"
+      ],
+      "introduces": [
+        "ON CONFLICT",
+        "DO UPDATE",
+        "DO NOTHING",
+        "EXCLUDED",
+        "RETURNING"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/10-cte-nang-cao",
+      "order": 10,
+      "module": "Truy vấn nâng cao",
+      "title": "CTE ghi dữ liệu và MATERIALIZED",
+      "objectives": [
+        "CTE chứa INSERT/UPDATE/DELETE … RETURNING",
+        "Hiểu khi nào PostgreSQL gộp CTE vào truy vấn chính, MATERIALIZED / NOT MATERIALIZED"
+      ],
+      "introduces": [
+        "MATERIALIZED"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/11-cte-de-quy",
+      "order": 11,
+      "module": "Truy vấn nâng cao",
+      "title": "CTE đệ quy",
+      "objectives": [
+        "Duyệt cây danh mục và sơ đồ tổ chức với WITH RECURSIVE",
+        "Hiểu phần neo, phần đệ quy và điều kiện dừng",
+        "Phát hiện vòng lặp, giới hạn độ sâu"
+      ],
+      "introduces": [
+        "RECURSIVE"
+      ],
+      "status": "planned",
+      "notes": "Cần dataset có quan hệ cha–con (danh mục lồng nhau hoặc nhân viên–quản lý)."
+    },
+    {
+      "id": "postgres/12-window-chuyen-sau",
+      "order": 12,
+      "module": "Truy vấn nâng cao",
+      "title": "Window function chuyên sâu",
+      "objectives": [
+        "So sánh với hàng trước/sau bằng LAG, LEAD",
+        "Khung cửa sổ: ROWS / RANGE BETWEEN, trung bình trượt",
+        "FIRST_VALUE, NTILE, PERCENT_RANK",
+        "Lọc trong hàm tổng hợp với FILTER"
+      ],
+      "introduces": [
+        "LAG",
+        "LEAD",
+        "ROWS",
+        "RANGE",
+        "PRECEDING",
+        "FOLLOWING",
+        "CURRENT ROW",
+        "FIRST_VALUE",
+        "NTILE",
+        "PERCENT_RANK",
+        "FILTER"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/13-lateral",
+      "order": 13,
+      "module": "Truy vấn nâng cao",
+      "title": "LATERAL và top-N mỗi nhóm",
+      "objectives": [
+        "Hiểu LATERAL cho phép truy vấn con tham chiếu bảng bên trái",
+        "Lấy N đơn gần nhất của mỗi khách",
+        "So sánh với cách dùng window function"
+      ],
+      "introduces": [
+        "LATERAL"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/14-explain",
+      "order": 14,
+      "module": "Hiệu năng",
+      "title": "Đọc kế hoạch thực thi với EXPLAIN",
+      "objectives": [
+        "Đọc EXPLAIN và EXPLAIN ANALYZE từ trong ra ngoài",
+        "Nhận biết Seq Scan, Index Scan, Bitmap Scan, các kiểu join",
+        "So sánh số hàng ước tính và thực tế, vai trò của ANALYZE"
+      ],
+      "introduces": [
+        "EXPLAIN",
+        "ANALYZE"
+      ],
+      "status": "planned",
+      "notes": "Cần dataset lớn (sinh bằng generate_series)."
+    },
+    {
+      "id": "postgres/15-index-chuyen-sau",
+      "order": 15,
+      "module": "Hiệu năng",
+      "title": "Các loại index",
+      "objectives": [
+        "B-tree, index nhiều cột và thứ tự cột",
+        "Partial index, expression index",
+        "GIN cho JSONB/mảng/tìm kiếm, GiST, BRIN",
+        "Index-only scan và INCLUDE"
+      ],
+      "introduces": [
+        "USING",
+        "GIN",
+        "GIST",
+        "BRIN",
+        "INCLUDE"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/16-mvcc-isolation",
+      "order": 16,
+      "module": "Đồng thời",
+      "title": "MVCC và mức cô lập",
+      "objectives": [
+        "Hiểu MVCC: mỗi transaction thấy một ảnh chụp dữ liệu",
+        "Các mức cô lập: READ COMMITTED, REPEATABLE READ, SERIALIZABLE",
+        "Hiện tượng: dirty read, non-repeatable read, phantom, lost update",
+        "VACUUM và vì sao bảng phình ra"
+      ],
+      "introduces": [
+        "ISOLATION LEVEL",
+        "READ COMMITTED",
+        "REPEATABLE READ",
+        "SERIALIZABLE",
+        "VACUUM"
+      ],
+      "status": "planned",
+      "notes": "PGlite chỉ có 1 kết nối: minh họa hai phiên song song bằng sơ đồ dòng thời gian từng bước, không chạy thật song song."
+    },
+    {
+      "id": "postgres/17-lock",
+      "order": 17,
+      "module": "Đồng thời",
+      "title": "Khóa và deadlock",
+      "objectives": [
+        "Khóa hàng với SELECT … FOR UPDATE / FOR SHARE, SKIP LOCKED",
+        "Deadlock xảy ra thế nào và cách phòng tránh",
+        "Advisory lock"
+      ],
+      "introduces": [
+        "FOR UPDATE",
+        "FOR SHARE",
+        "SKIP LOCKED",
+        "NOWAIT",
+        "PG_ADVISORY_LOCK"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/18-view-materialized",
+      "order": 18,
+      "module": "Đối tượng trong database",
+      "title": "View và materialized view",
+      "objectives": [
+        "Materialized view lưu kết quả, làm mới bằng REFRESH",
+        "REFRESH … CONCURRENTLY và điều kiện cần",
+        "Chọn giữa view, materialized view và bảng tổng hợp"
+      ],
+      "introduces": [
+        "MATERIALIZED VIEW",
+        "REFRESH",
+        "CONCURRENTLY"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/19-function-plpgsql",
+      "order": 19,
+      "module": "Đối tượng trong database",
+      "title": "Function và PL/pgSQL",
+      "objectives": [
+        "Viết function bằng SQL và PL/pgSQL",
+        "Biến, IF, vòng lặp, RAISE",
+        "Function trả về bảng; IMMUTABLE / STABLE / VOLATILE"
+      ],
+      "introduces": [
+        "CREATE FUNCTION",
+        "RETURNS",
+        "LANGUAGE",
+        "PLPGSQL",
+        "DECLARE",
+        "RAISE",
+        "IMMUTABLE",
+        "STABLE",
+        "VOLATILE",
+        "DO"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/20-trigger",
+      "order": 20,
+      "module": "Đối tượng trong database",
+      "title": "Trigger",
+      "objectives": [
+        "Trigger BEFORE / AFTER, FOR EACH ROW",
+        "Ví dụ: tự cập nhật updated_at, ghi nhật ký thay đổi",
+        "Rủi ro của trigger: logic ẩn, hiệu năng"
+      ],
+      "introduces": [
+        "CREATE TRIGGER",
+        "BEFORE",
+        "AFTER",
+        "FOR EACH ROW",
+        "NEW",
+        "OLD"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/21-full-text-search",
+      "order": 21,
+      "module": "Tìm kiếm",
+      "title": "Tìm kiếm toàn văn",
+      "objectives": [
+        "tsvector, tsquery và toán tử @@",
+        "Xếp hạng kết quả với ts_rank",
+        "Xử lý tiếng Việt có dấu với unaccent; index GIN cho tìm kiếm"
+      ],
+      "introduces": [
+        "TSVECTOR",
+        "TSQUERY",
+        "TO_TSVECTOR",
+        "TO_TSQUERY",
+        "@@",
+        "TS_RANK",
+        "UNACCENT"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/22-role-rls",
+      "order": 22,
+      "module": "Bảo mật",
+      "title": "Role, quyền và Row Level Security",
+      "objectives": [
+        "Tạo role, GRANT / REVOKE quyền",
+        "Row Level Security: mỗi người chỉ thấy hàng của mình",
+        "Nguyên tắc quyền tối thiểu"
+      ],
+      "introduces": [
+        "CREATE ROLE",
+        "GRANT",
+        "REVOKE",
+        "POLICY",
+        "ROW LEVEL SECURITY"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/23-rang-buoc-nang-cao",
+      "order": 23,
+      "module": "Thiết kế nâng cao",
+      "title": "Ràng buộc và kiểu tự định nghĩa",
+      "objectives": [
+        "ENUM và DOMAIN",
+        "EXCLUDE constraint chống đặt trùng lịch",
+        "Ràng buộc DEFERRABLE"
+      ],
+      "introduces": [
+        "ENUM",
+        "CREATE TYPE",
+        "DOMAIN",
+        "EXCLUDE",
+        "DEFERRABLE"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/24-partitioning",
+      "order": 24,
+      "module": "Thiết kế nâng cao",
+      "title": "Phân vùng bảng",
+      "objectives": [
+        "Phân vùng theo khoảng, danh sách, hash",
+        "Partition pruning",
+        "Khi nào nên và không nên phân vùng"
+      ],
+      "introduces": [
+        "PARTITION OF",
+        "FOR VALUES"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "postgres/25-du-an",
+      "order": 25,
+      "module": "Tổng kết",
+      "title": "Dự án: hệ thống đơn hàng trên PostgreSQL",
+      "objectives": [
+        "Thiết kế schema có JSONB, ràng buộc, index phù hợp",
+        "Viết báo cáo với CTE, window function",
+        "Tối ưu một truy vấn chậm bằng EXPLAIN ANALYZE"
+      ],
+      "introduces": [],
+      "status": "planned"
+    },
+    {
+      "id": "mysql/01-gioi-thieu",
+      "order": 1,
+      "module": "Nền tảng",
+      "title": "Làm quen MySQL",
+      "objectives": [
+        "Biết MySQL là gì, vị trí của nó so với PostgreSQL",
+        "Hiểu cách lộ trình này thực hành (SQLite cho phần chung, ví dụ tĩnh cho phần riêng)"
+      ],
+      "introduces": [],
+      "status": "rewrite"
+    },
+    {
+      "id": "mysql/02-cai-dat",
+      "order": 2,
+      "module": "Nền tảng",
+      "title": "Cài đặt và kết nối",
+      "objectives": [
+        "Chạy MySQL 8 bằng Docker",
+        "Kết nối bằng mysql client và một công cụ giao diện",
+        "Nạp dataset shop vào MySQL để tự thực hành"
+      ],
+      "introduces": [],
+      "status": "planned",
+      "notes": "Cần file shop.mysql.sql tương thích MySQL để người học tải về."
+    },
+    {
+      "id": "mysql/03-kieu-du-lieu",
+      "order": 3,
+      "module": "Nền tảng",
+      "title": "Kiểu dữ liệu trong MySQL",
+      "objectives": [
+        "TINYINT … BIGINT, UNSIGNED, DECIMAL",
+        "VARCHAR, TEXT và giới hạn độ dài",
+        "DATETIME và TIMESTAMP khác nhau thế nào (múi giờ, phạm vi)",
+        "ENUM, BOOLEAN thực chất là TINYINT(1)"
+      ],
+      "introduces": [
+        "TINYINT",
+        "UNSIGNED",
+        "DATETIME"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "mysql/04-charset-collation",
+      "order": 4,
+      "module": "Nền tảng",
+      "title": "Bảng mã và collation",
+      "objectives": [
+        "Vì sao phải dùng utf8mb4 thay cho utf8",
+        "Collation quyết định so sánh và sắp xếp: phân biệt hoa thường, dấu tiếng Việt",
+        "Lỗi hay gặp khi so sánh chuỗi tiếng Việt"
+      ],
+      "introduces": [
+        "CHARACTER SET",
+        "COLLATE"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "mysql/05-khac-biet-cu-phap",
+      "order": 5,
+      "module": "Khác biệt với SQL chuẩn",
+      "title": "Những điểm MySQL khác SQL chuẩn",
+      "objectives": [
+        "Backtick, nháy kép và sql_mode",
+        "IFNULL, CONCAT, LIMIT offset, count",
+        "ONLY_FULL_GROUP_BY và lỗi GROUP BY quen thuộc"
+      ],
+      "introduces": [
+        "IFNULL",
+        "CONCAT"
+      ],
+      "status": "planned",
+      "notes": "Bài basics/08 hẹn: cách làm tương đương NULLS FIRST/LAST trong MySQL (ví dụ ORDER BY cot IS NULL, cot)."
+    },
+    {
+      "id": "mysql/06-auto-increment-upsert",
+      "order": 6,
+      "module": "Khác biệt với SQL chuẩn",
+      "title": "AUTO_INCREMENT và UPSERT",
+      "objectives": [
+        "AUTO_INCREMENT và LAST_INSERT_ID",
+        "INSERT … ON DUPLICATE KEY UPDATE, INSERT IGNORE, REPLACE",
+        "So sánh với ON CONFLICT của PostgreSQL"
+      ],
+      "introduces": [
+        "AUTO_INCREMENT",
+        "LAST_INSERT_ID",
+        "ON DUPLICATE KEY UPDATE",
+        "IGNORE",
+        "REPLACE INTO"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "mysql/07-innodb",
+      "order": 7,
+      "module": "Bên trong InnoDB",
+      "title": "InnoDB và clustered index",
+      "objectives": [
+        "Storage engine là gì, vì sao InnoDB là mặc định",
+        "Bảng InnoDB được lưu theo khóa chính (clustered index)",
+        "Hệ quả khi chọn khóa chính: UUID ngẫu nhiên và số tăng dần"
+      ],
+      "introduces": [
+        "ENGINE"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "mysql/08-index-explain",
+      "order": 8,
+      "module": "Bên trong InnoDB",
+      "title": "Index và EXPLAIN trong MySQL",
+      "objectives": [
+        "Secondary index trỏ về khóa chính",
+        "Covering index, quy tắc tiền tố trái nhất",
+        "Đọc EXPLAIN: type, key, rows, Extra"
+      ],
+      "introduces": [],
+      "status": "planned"
+    },
+    {
+      "id": "mysql/09-json",
+      "order": 9,
+      "module": "Tính năng MySQL 8",
+      "title": "Kiểu JSON trong MySQL",
+      "objectives": [
+        "Đọc JSON với -> và ->>, JSON_EXTRACT",
+        "JSON_TABLE biến JSON thành bảng",
+        "Index trên cột sinh (generated column) từ JSON"
+      ],
+      "introduces": [
+        "JSON_EXTRACT",
+        "JSON_TABLE"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "mysql/10-window-cte",
+      "order": 10,
+      "module": "Tính năng MySQL 8",
+      "title": "CTE và window function trong MySQL 8",
+      "objectives": [
+        "Những gì MySQL 8 hỗ trợ và chưa hỗ trợ so với PostgreSQL",
+        "Viết lại truy vấn kiểu cũ (biến @) bằng window function"
+      ],
+      "introduces": [],
+      "status": "planned"
+    },
+    {
+      "id": "mysql/11-transaction-isolation",
+      "order": 11,
+      "module": "Đồng thời",
+      "title": "Transaction và mức cô lập trong InnoDB",
+      "objectives": [
+        "Mặc định REPEATABLE READ và consistent read",
+        "Gap lock, next-key lock chống phantom",
+        "So sánh với PostgreSQL"
+      ],
+      "introduces": [],
+      "status": "planned"
+    },
+    {
+      "id": "mysql/12-lock-deadlock",
+      "order": 12,
+      "module": "Đồng thời",
+      "title": "Khóa và deadlock trong InnoDB",
+      "objectives": [
+        "Khóa hàng, khóa bảng, SELECT … FOR UPDATE",
+        "Đọc thông tin deadlock trong SHOW ENGINE INNODB STATUS",
+        "Cách giảm deadlock trong ứng dụng"
+      ],
+      "introduces": [],
+      "status": "planned"
+    },
+    {
+      "id": "mysql/13-procedure",
+      "order": 13,
+      "module": "Đối tượng trong database",
+      "title": "Stored procedure và function",
+      "objectives": [
+        "Viết procedure với tham số IN/OUT, DELIMITER",
+        "Biến, IF, vòng lặp, xử lý lỗi",
+        "Khi nào nên để logic trong ứng dụng"
+      ],
+      "introduces": [
+        "CREATE PROCEDURE",
+        "CALL",
+        "DELIMITER"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "mysql/14-trigger-event",
+      "order": 14,
+      "module": "Đối tượng trong database",
+      "title": "Trigger và Event Scheduler",
+      "objectives": [
+        "Trigger trong MySQL và giới hạn của nó",
+        "Chạy tác vụ định kỳ với CREATE EVENT"
+      ],
+      "introduces": [
+        "CREATE EVENT"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "mysql/15-user-quyen",
+      "order": 15,
+      "module": "Vận hành",
+      "title": "Người dùng và phân quyền",
+      "objectives": [
+        "Tạo user, GRANT quyền theo database/bảng",
+        "Role trong MySQL 8",
+        "Nguyên tắc quyền tối thiểu cho ứng dụng"
+      ],
+      "introduces": [
+        "CREATE USER"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "mysql/16-backup-replication",
+      "order": 16,
+      "module": "Vận hành",
+      "title": "Sao lưu và replication",
+      "objectives": [
+        "Sao lưu logic với mysqldump, khôi phục",
+        "Binary log và point-in-time recovery",
+        "Replication nguồn–bản sao ở mức khái niệm"
+      ],
+      "introduces": [],
+      "status": "planned"
+    },
+    {
+      "id": "mysql/17-du-an",
+      "order": 17,
+      "module": "Tổng kết",
+      "title": "Dự án: chuyển dataset sang MySQL và tối ưu",
+      "objectives": [
+        "Chuyển schema shop sang MySQL đúng kiểu dữ liệu và collation",
+        "Viết báo cáo và tối ưu bằng index, EXPLAIN"
+      ],
+      "introduces": [],
+      "status": "planned"
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+---
+import Base from '../layouts/Base.astro';
+import { tracks } from '../data/tracks';
+import { lessonsByTrack } from '../lib/lessons';
+import { withBase } from '../lib/url';
+
+const rows = await Promise.all(
+  tracks.map(async (t) => ({ ...t, count: (await lessonsByTrack(t.id)).length })),
+);
+---
+
+<Base title="Học SQL: từ câu SELECT đầu tiên tới PostgreSQL và MySQL">
+  <main id="main" class="wrap home">
+    <h1>Học SQL bằng cách chạy SQL.</h1>
+    <p class="lede">
+      Mỗi bài có một ô để bạn viết câu lệnh và xem kết quả ngay trên trình duyệt. Không cần cài
+      database, không cần tài khoản.
+    </p>
+
+    <figure class="catalog">
+      <pre class="catalog-sql" aria-label="Câu truy vấn lấy danh sách lộ trình"><code><span class="k">SELECT</span> lo_trinh, danh_cho<span class="col-wide">, noi_dung</span>, so_bai
+<span class="k">FROM</span>   khoa_hoc
+<span class="k">ORDER BY</span> thu_tu;</code></pre>
+
+      <div class="catalog-grid">
+        <table class="grid-table">
+          <thead>
+            <tr>
+              <th scope="col">lo_trinh</th>
+              <th scope="col">danh_cho</th>
+              <th scope="col" class="col-wide">noi_dung</th>
+              <th scope="col" class="num">so_bai</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((t) => (
+              <tr>
+                <td>
+                  <a href={withBase(`/${t.id}/`)} data-astro-prefetch>{t.name}</a>
+                </td>
+                <td>{t.level}</td>
+                <td class="col-wide">{t.summary}</td>
+                <td class="num">{t.count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <figcaption>{rows.length} hàng. Chọn một hàng để bắt đầu học.</figcaption>
+    </figure>
+
+    <p class="order-note">
+      Chưa biết SQL thì bắt đầu ở hàng đầu tiên. Hai lộ trình sau dùng chung kiến thức nền đó, học
+      cái nào trước cũng được.
+    </p>
+  </main>
+</Base>
+
+<style>
+  .home { padding-block: clamp(2.5rem, 7vw, 5.5rem) var(--space-8); }
+  h1 {
+    font-size: var(--step-4);
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+    font-weight: 700;
+    margin: 0 0 var(--space-5);
+    max-width: 14ch;
+  }
+  .lede {
+    font-size: var(--step-1);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 40ch;
+    margin: 0 0 var(--space-7);
+  }
+
+  .catalog {
+    max-width: 62rem;
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-m);
+    overflow: hidden;
+  }
+  .catalog-sql {
+    margin: 0;
+    padding: var(--space-4) 1.25rem;
+    font-size: clamp(0.85rem, 1.6vw, 1.02rem);
+    line-height: 1.7;
+    overflow-x: auto;
+    color: var(--ink);
+    border-bottom: 1px solid var(--rule);
+  }
+  .catalog-sql .k { color: var(--code-keyword); font-weight: 600; }
+  .catalog-grid { overflow-x: auto; }
+  .catalog td { padding-block: 0.95rem; font-size: var(--step-0); color: var(--ink); }
+  .catalog td:first-child { font-weight: 600; white-space: nowrap; }
+  .catalog td:not(:first-child) { color: var(--ink-soft); }
+
+  /* Cả hàng bấm được; hàng đang trỏ/focus được tô như bút dạ quang */
+  .catalog tbody tr { position: relative; }
+  .catalog tbody a { text-decoration: none; }
+  .catalog tbody a::after { content: ''; position: absolute; inset: 0; }
+  .catalog tbody a:focus-visible { outline: none; }
+  .catalog tbody tr:hover td,
+  .catalog tbody tr:has(a:focus-visible) td {
+    background: var(--mark);
+    color: var(--mark-ink);
+  }
+  .catalog tbody tr:has(a:focus-visible) { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+  figcaption {
+    padding: var(--space-2) 1.25rem;
+    font-size: var(--step--1);
+    color: var(--ink-soft);
+    background: var(--paper);
+    border-top: 1px solid var(--rule);
+  }
+  .order-note {
+    margin: var(--space-6) 0 0;
+    max-width: 56ch;
+    color: var(--ink-soft);
+  }
+
+  @media (max-width: 640px) {
+    .col-wide { display: none; }
+  }
+</style>

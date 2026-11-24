@@ -1,0 +1,256 @@
+---
+title: "NULL: giá trị không xác định"
+description: Hiểu NULL thật sự nghĩa là gì, vì sao "= NULL" không bao giờ đúng, logic ba giá trị của SQL, cách kiểm tra NULL bằng IS NULL và thay NULL bằng giá trị mặc định với COALESCE.
+order: 7
+---
+
+Các bài trước để lại vài câu hỏi chưa có lời giải. Ở bài 4, cửa hàng có 12 khách, `WHERE phone <> '0912345678'` loại một mình chị Hà, vậy mà kết quả chỉ có 6 khách chứ không phải 11. Ở bài 5, `NOT email = 'ha.nguyen@example.com'` ra 9 khách thay vì 11. Bài 6 nhắc rằng `NOT IN` cũng loại hàng NULL. Ở bài 3, `'Gọi: ' || phone` biến thành NULL với những khách không có số điện thoại.
+
+Thủ phạm chung là **NULL**. Bài này giải thích NULL thật sự nghĩa là gì, vì sao nó làm các phép so sánh hành xử "lạ", và cách làm việc với nó một cách an toàn. NULL là nguồn gốc của nhiều kết quả sai mà không có lỗi nào được báo, nên hiểu nó là điều kiện để viết câu truy vấn (query) đúng.
+
+## NULL nghĩa là "không biết"
+
+Bài 1 đã nói NULL nghĩa là "không có giá trị". Chính xác hơn, NULL nghĩa là **giá trị chưa biết** hoặc **không áp dụng được**. Trong dataset của cửa hàng có bốn cột (column) chứa NULL, mỗi cột theo một nghĩa hơi khác:
+
+| Cột | NULL ở những hàng (row) nào | Nghĩa |
+|---|---|---|
+| `customers.phone` | khách 2, 5, 7, 9, 11 | cửa hàng chưa biết số điện thoại |
+| `customers.email` | khách 4, 9 | cửa hàng không có email của khách (thường là khách đặt qua điện thoại) |
+| `customers.referred_by` | khách 1, 2, 5, 8, 11 | khách tự tìm đến, không ai giới thiệu: thông tin "không áp dụng được" |
+| `orders.shipped_on` | đơn 4, 12, 17, 18, 20 | đơn chưa gửi hoặc đã hủy, nên chưa có ngày gửi |
+
+NULL **không phải** số 0, **không phải** chuỗi rỗng `''`, và không phải chữ `'NULL'`. Số 0 là một con số cụ thể; chuỗi rỗng là một chuỗi cụ thể, chỉ là không có ký tự nào. Còn NULL là "không có thông tin". Ví dụ, nếu cửa hàng quy ước dùng `''` cho trường hợp "khách xác nhận không có số", thì `phone` của khách 2 là `''` có nghĩa "khách đã cho biết là không có số điện thoại"; còn NULL nghĩa là "chưa biết khách có số hay không". Bạn có thể tự thấy NULL không phải chuỗi rỗng hay chữ `'NULL'`:
+
+<Playground>
+```sql
+SELECT name, phone
+FROM customers
+WHERE phone = ''
+   OR phone = 'NULL';
+```
+</Playground>
+
+Kết quả (result set) có **0 hàng**: trong dữ liệu không có số điện thoại nào là chuỗi rỗng hay chữ `'NULL'`. Năm khách không có số mang giá trị NULL thật, và cả hai phép so sánh đều không khớp với họ, vì lý do bạn sẽ thấy ngay dưới đây.
+
+## Vì sao "= NULL" không bao giờ đúng
+
+Hãy thử cách tự nhiên nhất để tìm khách chưa có số điện thoại:
+
+<Playground>
+```sql
+SELECT name, phone
+FROM customers
+WHERE phone = NULL;
+```
+</Playground>
+
+Kết quả có **0 hàng**, dù rõ ràng có 5 khách chưa có số. Câu lệnh (statement) không báo lỗi, chỉ lặng lẽ không trả về gì.
+
+Lý do nằm ở ý nghĩa của NULL. Câu hỏi "số điện thoại của anh Khoa có bằng một giá trị không biết không?" chỉ có một câu trả lời trung thực: **không biết**. Database cũng trả lời đúng như vậy: so sánh bất cứ thứ gì với NULL đều cho ra NULL, nghĩa là "không xác định" (unknown), chứ không phải đúng hay sai. Kể cả `NULL = NULL` cũng ra NULL: hai giá trị không biết thì không thể khẳng định chúng bằng nhau.
+
+Mà `WHERE` chỉ giữ những hàng có điều kiện (condition) cho kết quả **đúng**. "Không xác định" không phải là đúng, nên mọi hàng đều bị loại.
+
+## IS NULL và IS NOT NULL
+
+Để kiểm tra một giá trị có phải NULL hay không, SQL có phép kiểm tra riêng: `IS NULL`. Khác với `=`, phép này luôn trả lời đúng hoặc sai, không bao giờ "không xác định":
+
+<Playground>
+```sql
+SELECT name, phone
+FROM customers
+WHERE phone IS NULL;
+```
+</Playground>
+
+Kết quả có **5 khách**: Trần Minh Khoa, Võ Thanh Tâm, Bùi Anh Tuấn, Ngô Đức Thịnh và Trịnh Quang Vinh. Đây đúng là 5 khách mà bài 2 đã thấy có số điện thoại NULL.
+
+`IS NOT NULL` làm ngược lại, giữ những hàng **có** giá trị. Ví dụ, các đơn đã được gửi đi (đã có ngày gửi):
+
+<Playground>
+```sql
+SELECT id,
+       status,
+       shipped_on
+FROM orders
+WHERE shipped_on IS NOT NULL;
+```
+</Playground>
+
+Kết quả có **15 đơn**: 12 đơn đã giao và 3 đơn đang giao. Năm đơn còn lại (2 đơn đã hủy và 3 đơn chờ xác nhận) có `shipped_on` là NULL nên bị loại. Chú ý cách đọc: `shipped_on IS NOT NULL` là "ngày gửi **không phải** NULL", tức là "đã có ngày gửi".
+
+## Logic ba giá trị
+
+Từ bài 5, bạn đã quen với điều kiện có hai giá trị: đúng hoặc sai. Khi có NULL, SQL dùng **ba** giá trị: **đúng**, **sai** và **không xác định**. Các phép `AND`, `OR`, `NOT` xử lý giá trị thứ ba theo một nguyên tắc rất tự nhiên: hãy coi "không xác định" là "có thể đúng, có thể sai", rồi hỏi xem kết quả có phụ thuộc vào nó không.
+
+| Biểu thức | Kết quả | Vì sao |
+|---|---|---|
+| đúng `AND` không xác định | không xác định | nếu cái chưa biết là sai thì cả câu sai, nếu đúng thì cả câu đúng: chưa kết luận được |
+| sai `AND` không xác định | **sai** | đã có một vế sai thì `AND` chắc chắn sai |
+| đúng `OR` không xác định | **đúng** | đã có một vế đúng thì `OR` chắc chắn đúng |
+| sai `OR` không xác định | không xác định | phụ thuộc vào cái chưa biết |
+| không xác định `OR` không xác định | không xác định | cả hai vế đều chưa biết |
+| `NOT` không xác định | không xác định | đảo "có thể đúng, có thể sai" vẫn là "có thể đúng, có thể sai" |
+
+Đổi chỗ hai vế của `AND` hay `OR` không làm thay đổi kết quả: "không xác định `OR` đúng" cũng là đúng.
+
+Bạn có thể tự kiểm tra cả bảng. Câu lệnh dưới đây có một điểm mới: nó **không có `FROM`**. SQLite (và cả PostgreSQL, MySQL) cho phép dùng `SELECT` chỉ để tính các biểu thức (expression) không lấy từ bảng (table) nào; kết quả luôn có đúng 1 hàng. Trong SQLite, đúng được viết là `1`, sai là `0`:
+
+<Playground>
+```sql
+SELECT 1 = NULL AS bang_null,
+       NULL = NULL AS null_bang_null,
+       1 AND NULL AS dung_and,
+       0 AND NULL AS sai_and,
+       1 OR NULL AS dung_or,
+       0 OR NULL AS sai_or,
+       NOT NULL AS phu_dinh_null,
+       NULL + 1 AS cong_null;
+```
+</Playground>
+
+Kết quả có 1 hàng. `bang_null`, `null_bang_null`, `dung_and`, `sai_or` và `phu_dinh_null` đều là NULL (không xác định). `sai_and` là `0` (sai) và `dung_or` là `1` (đúng), đúng như bảng ở trên. Cột cuối `cong_null` là NULL: như bài 3 đã nói, cộng một con số với một giá trị không biết thì kết quả cũng không biết.
+
+Đừng chép câu này sang PostgreSQL: PostgreSQL không coi `1` là "đúng", nên `1 AND NULL` báo lỗi `argument of AND must be type boolean`. Trên PostgreSQL bạn sẽ viết `true AND NULL`.
+
+## Giải đáp các "điều lạ" ở bài trước
+
+Giờ bạn đã đủ công cụ để giải thích các kết quả bất ngờ ở bài 4, 5 và 6.
+
+**Vì sao `phone <> '0912345678'` ra 6 khách chứ không phải 11?** Với mỗi khách, database tính điều kiện:
+
+- Chị Hà có số `'0912345678'`: so sánh cho ra **sai**, hàng bị loại.
+- 6 khách có số khác: so sánh cho ra **đúng**, hàng được giữ.
+- 5 khách có `phone` là NULL: "một số không biết có khác `'0912345678'` không?" cho ra **không xác định**, hàng bị loại.
+
+Kết quả: 6 hàng. Nếu bạn thật sự muốn "mọi khách trừ chị Hà", kể cả những khách chưa có số, hãy nói rõ điều đó bằng `IS NULL`:
+
+<Playground>
+```sql
+SELECT name, phone
+FROM customers
+WHERE phone <> '0912345678'
+   OR phone IS NULL;
+```
+</Playground>
+
+Kết quả có **11 khách**. Với 5 khách không có số, vế đầu cho ra không xác định nhưng vế sau `phone IS NULL` cho ra đúng; theo bảng logic ba giá trị, không xác định `OR` đúng là **đúng**, nên các hàng này được giữ.
+
+Bài 5 cũng giống hệt: `NOT email = 'ha.nguyen@example.com'` loại chị Hà (sai) và loại Phạm Quốc Huy cùng Ngô Đức Thịnh, hai khách có email NULL (`NOT` không xác định vẫn là không xác định). Còn lại 9 khách.
+
+`NOT IN` ở bài 6 cũng vậy, và đây là một ví dụ mới trên cột có NULL. `phone NOT IN ('0912345678', '0987654321')` chính là `NOT (phone = '0912345678' OR phone = '0987654321')`. Với khách có `phone` là NULL, mỗi phép `=` ra không xác định, `OR` của hai cái không xác định vẫn là không xác định, và `NOT` cũng vậy. Kết quả chỉ có 5 khách: 12 khách, trừ 2 khách có đúng hai số đó, trừ tiếp 5 khách không có số.
+
+Quy tắc rút ra: **khi một cột có thể chứa NULL, mọi điều kiện so sánh trên cột đó đều âm thầm loại các hàng NULL**. Nếu bạn muốn giữ chúng, hãy thêm `OR cột IS NULL`. Nếu câu đã có `AND`, nhớ đặt ngoặc như bài 5: `city = 'Hà Nội' AND (phone <> '0912345678' OR phone IS NULL)`. Thiếu ngoặc, `OR` sẽ "nuốt" điều kiện thành phố.
+
+## COALESCE: thay NULL bằng giá trị mặc định
+
+Nhiều khi bạn không muốn lọc bỏ NULL, mà muốn **hiển thị** một thứ dễ hiểu hơn thay cho nó. Việc này cần đến `COALESCE`, **hàm** (function) đầu tiên của khóa học. Một hàm có tên, theo sau là cặp ngoặc tròn chứa các giá trị đầu vào cách nhau bởi dấu phẩy, và trả về một giá trị; bài 10 sẽ giới thiệu nhiều hàm khác. `COALESCE` thường nhận từ hai giá trị trở lên (SQLite bắt buộc như vậy) và trả về **giá trị đầu tiên không phải NULL**:
+
+<Playground>
+```sql
+SELECT name,
+       'Gọi: ' || COALESCE(phone, 'chưa có số') AS goi_dien,
+       COALESCE(email, phone, 'không có liên hệ') AS lien_he
+FROM customers;
+```
+</Playground>
+
+Kết quả có 12 hàng, và không còn NULL nào. Hãy đọc từng cột:
+
+- `goi_dien`: với chị Hà là `Gọi: 0912345678`; với anh Khoa, `phone` là NULL nên `COALESCE` trả về `'chưa có số'`, và kết quả là `Gọi: chưa có số` thay vì NULL như ở bài 3.
+- `lien_he`: `COALESCE` thử lần lượt từ trái sang phải. Phần lớn khách có email nên cột này là email. Phạm Quốc Huy không có email, `COALESCE` chuyển sang `phone`: `0909876543`. Ngô Đức Thịnh không có cả email lẫn số điện thoại, nên nhận giá trị cuối cùng: `không có liên hệ`.
+
+`COALESCE` chỉ trả về NULL khi **tất cả** các giá trị đều là NULL. Vì vậy người ta thường đặt một giá trị cố định ở cuối làm "lưới an toàn".
+
+<Callout type="note" title="COALESCE chỉ đổi cách hiển thị">
+`COALESCE` không sửa dữ liệu trong bảng (table): cột `phone` của anh Khoa vẫn là NULL. Giống như bí danh (alias) và cột tính toán ở bài 3, giá trị thay thế chỉ có trong kết quả.
+</Callout>
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Viết = NULL hoặc <> NULL">
+`WHERE phone = NULL` và `WHERE phone <> NULL` đều trả về 0 hàng mà không báo lỗi, vì so sánh với NULL luôn cho ra "không xác định". Mỗi khi định gõ `= NULL`, hãy đổi thành `IS NULL`; định gõ `<> NULL`, hãy đổi thành `IS NOT NULL`.
+</Callout>
+
+<Callout type="warn" title="Quên rằng cột có NULL">
+Câu lệnh `WHERE phone <> '0912345678'` trông vô hại nhưng âm thầm bỏ mất 5 khách. Trước khi lọc bằng `<>`, `NOT` hay `NOT IN` trên một cột, hãy tự hỏi: cột này có chứa NULL không? Cách kiểm tra nhanh là chạy `WHERE cột IS NULL` xem có hàng nào không. Nếu có, quyết định rõ ràng bạn muốn giữ hay bỏ chúng, rồi viết điều đó ra bằng `IS NULL` / `IS NOT NULL`.
+</Callout>
+
+<Callout type="warn" title="COALESCE trộn kiểu dữ liệu">
+Trên SQLite, `COALESCE(shipped_on, 'chưa gửi')` chạy được. Nhưng PostgreSQL báo lỗi `invalid input syntax for type date: "chưa gửi"`, vì ở PostgreSQL mọi giá trị trong `COALESCE` phải cùng kiểu dữ liệu (data type): `shipped_on` là ngày, còn `'chưa gửi'` là chữ. Bài 10 sẽ dạy cách đổi kiểu dữ liệu để viết được câu này trên mọi database.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| `NULL = NULL` | NULL | NULL | NULL |
+| Đúng / sai hiển thị là | `1` / `0` | `true` / `false` | `1` / `0` |
+| `COALESCE(ngày, 'chữ')` | chạy được | lỗi kiểu dữ liệu | chạy được |
+| So sánh "bằng nhau, coi hai NULL là bằng" | `a IS b` | `a IS NOT DISTINCT FROM b` | `a <=> b` |
+
+Hàng cuối là cách mỗi database cho phép so sánh mà coi hai NULL là bằng nhau. Bạn chưa cần dùng tới, nhưng sẽ gặp khi đọc mã của người khác.
+
+## Tóm tắt
+
+- NULL nghĩa là "không biết" hoặc "không áp dụng", khác số 0 và chuỗi rỗng.
+- Mọi phép so sánh với NULL (`=`, `<>`, `<`…), kể cả `NULL = NULL`, đều cho ra **không xác định**, và `WHERE` loại các hàng không xác định. Vì vậy `= NULL` không bao giờ tìm được gì.
+- Dùng `IS NULL` và `IS NOT NULL` để kiểm tra NULL.
+- Logic ba giá trị: sai `AND` bất cứ gì là sai; đúng `OR` bất cứ gì là đúng; còn lại, có "không xác định" tham gia thì thường ra không xác định.
+- Lọc bằng `<>`, `NOT`, `NOT IN` trên cột có NULL sẽ âm thầm loại các hàng NULL; muốn giữ thì thêm `OR cột IS NULL`.
+- `COALESCE(a, b, …)` trả về giá trị đầu tiên không phải NULL, dùng để hiển thị giá trị mặc định thay cho NULL.
+
+## Bài tập
+
+<Exercise hint="Cột email nằm ở bảng khách hàng. Dùng phép kiểm tra dành riêng cho NULL.">
+Lập danh sách khách **cần bổ sung email**: lấy **mọi** khách chưa có email, kể cả khách chưa có số điện thoại. Kết quả gồm 2 cột theo thứ tự: tên khách, số điện thoại.
+
+```sql
+SELECT name, phone
+FROM customers
+WHERE email IS NULL;
+```
+</Exercise>
+
+<Exercise hint="Khách tự tìm đến là khách không có người giới thiệu. So sánh với NULL bằng = luôn ra 'không xác định'." starter={"SELECT name, joined_on\nFROM customers\nWHERE referred_by = NULL;\n"}>
+Câu lệnh có sẵn trong ô muốn lấy những khách **tự tìm đến** cửa hàng (không ai giới thiệu), nhưng lại trả về 0 hàng. Hãy sửa cho đúng, giữ nguyên 2 cột `name`, `joined_on`.
+
+```sql
+SELECT name, joined_on
+FROM customers
+WHERE referred_by IS NULL;
+```
+</Exercise>
+
+<Exercise hint="Khách được giới thiệu là khách có người giới thiệu. Hai điều kiện, cả hai đều liên quan tới NULL.">
+Cửa hàng muốn nhờ người giới thiệu xin giúp số điện thoại: lấy những khách **có người giới thiệu** nhưng **chưa có số điện thoại**. Kết quả gồm 2 cột theo thứ tự: tên khách, mã người giới thiệu.
+
+```sql
+SELECT name, referred_by
+FROM customers
+WHERE referred_by IS NOT NULL
+  AND phone IS NULL;
+```
+</Exercise>
+
+<Exercise hint="Nối tên, chuỗi ' - ', rồi COALESCE của số điện thoại. Lọc thành phố bằng WHERE.">
+In nhãn giao hàng cho khách ở Hà Nội theo mẫu `Tên - Số điện thoại`; khách chưa có số thì ghi `Tên - không có SĐT`. Kết quả chỉ có 1 cột.
+
+```sql
+SELECT name || ' - ' || COALESCE(phone, 'không có SĐT') AS nhan
+FROM customers
+WHERE city = 'Hà Nội';
+```
+</Exercise>
+
+<Exercise hint="Thiếu số điện thoại HOẶC thiếu email; cả nhóm đó còn phải AND với điều kiện thành phố. Nhớ bài 5: có cả AND và OR thì đặt ngoặc.">
+Tìm những khách **không ở Hà Nội** và **còn thiếu** số điện thoại hoặc email (thiếu một trong hai, hoặc thiếu cả hai). Kết quả gồm 2 cột theo thứ tự: `name`, `city`.
+
+```sql
+SELECT name, city
+FROM customers
+WHERE city <> 'Hà Nội'
+  AND (phone IS NULL OR email IS NULL);
+```
+</Exercise>
+
+Bài tiếp theo dạy cách sắp xếp kết quả theo ý muốn với `ORDER BY`, thay cho thứ tự không kiểm soát được mà bài 1 đã cảnh báo, và trả lời câu hỏi NULL nên đứng đầu hay cuối khi sắp xếp.

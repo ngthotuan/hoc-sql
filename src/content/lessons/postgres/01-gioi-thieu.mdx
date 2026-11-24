@@ -1,0 +1,44 @@
+---
+title: Làm quen PostgreSQL
+description: Vì sao PostgreSQL được ưa chuộng, và chạy thử một PostgreSQL thật ngay trên trình duyệt.
+order: 1
+---
+
+PostgreSQL (gọi tắt là Postgres) là hệ quản trị database mã nguồn mở, nổi tiếng vì tuân thủ chuẩn SQL chặt chẽ và có nhiều kiểu dữ liệu mạnh như `JSONB`, mảng, khoảng thời gian.
+
+Các ô thực hành trong lộ trình này chạy **PostgreSQL thật** (bản biên dịch sang WebAssembly), không phải mô phỏng. Lần chạy đầu sẽ tải khoảng 5 MB, các lần sau trình duyệt dùng lại bản đã lưu.
+
+## Phiên bản đang chạy
+
+<Playground engine="postgres">
+```sql
+SELECT version();
+```
+</Playground>
+
+## Kiểu dữ liệu đặc thù
+
+Postgres có kiểu `DATE` thật, nên bạn tính toán được trên ngày tháng:
+
+<Playground engine="postgres">
+```sql
+SELECT name,
+       joined_on,
+       CURRENT_DATE - joined_on AS so_ngay_tham_gia
+FROM customers
+ORDER BY joined_on;
+```
+</Playground>
+
+Và trả kết quả dạng JSON ngay trong câu truy vấn:
+
+<Playground engine="postgres">
+```sql
+SELECT jsonb_build_object(
+         'ten', name,
+         'gia', price
+       ) AS san_pham
+FROM products
+WHERE category = 'Trà';
+```
+</Playground>

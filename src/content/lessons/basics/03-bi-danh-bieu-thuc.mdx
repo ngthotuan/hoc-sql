@@ -1,0 +1,246 @@
+---
+title: Bí danh và biểu thức
+description: Đặt tên cho cột trong kết quả bằng AS, tính toán từ các cột có sẵn, nối chuỗi, và tránh bẫy chia số nguyên.
+order: 3
+---
+
+Ở bài trước, bạn đã chọn được những cột cần lấy. Nhưng có khi thông tin bạn cần không nằm sẵn trong cột (column) nào. Bảng (table) `order_items` cho biết khách mua bao nhiêu cái (`quantity`) và giá mỗi cái (`unit_price`), nhưng không có cột nào cho biết **thành tiền** của từng hàng (row). Bạn có cần thêm một cột vào bảng không? Không cần. SQL cho phép bạn tính ngay trong câu truy vấn (query): lấy `quantity` nhân `unit_price`, và đặt tên cho cột mới đó.
+
+Bài này dạy hai việc đi liền với nhau: tạo cột mới bằng **biểu thức** (expression), và đặt tên dễ hiểu cho cột bằng **bí danh** (alias).
+
+## Biểu thức: tính toán trong SELECT
+
+Sau `SELECT`, ngoài tên cột, bạn có thể viết một phép tính. Database tính phép tính đó cho **từng hàng** và đưa kết quả vào một cột mới:
+
+<Playground>
+```sql
+SELECT order_id,
+       product_id,
+       quantity,
+       unit_price,
+       quantity * unit_price
+FROM order_items;
+```
+</Playground>
+
+Cột cuối cùng là thành tiền của mỗi hàng. Nhìn hai hàng của đơn số 1: đơn này mua 2 cái Robusta (sản phẩm 2) giá 110000 đồng, nên thành tiền là 2 × 110000 = 220000; và 1 phin nhôm (sản phẩm 1) giá 45000, thành tiền 45000. Database làm phép nhân này lần lượt cho cả 34 hàng.
+
+Một phép tính như `quantity * unit_price` gọi là **biểu thức**: kết hợp tên cột, con số và phép toán để tạo ra một giá trị. Các phép toán số học trong SQL:
+
+| Phép toán | Ý nghĩa | Ví dụ |
+|---|---|---|
+| `+` | cộng | `price + 30000` |
+| `-` | trừ | `price - 5000` |
+| `*` | nhân | `quantity * unit_price` |
+| `/` | chia | `price / 1000` |
+
+Nhìn tiêu đề của cột cuối: SQLite lấy luôn nội dung biểu thức `quantity * unit_price` làm tên cột. Tên này dài và khó đọc. PostgreSQL còn tệ hơn: nó đặt tên là `?column?`. Đây là lúc cần đến bí danh.
+
+## Đặt tên cột bằng AS
+
+Từ khóa (keyword) `AS` đặt một **bí danh** cho cột trong kết quả (result set):
+
+<Playground>
+```sql
+SELECT order_id,
+       product_id,
+       quantity * unit_price AS thanh_tien
+FROM order_items;
+```
+</Playground>
+
+Kết quả vẫn 34 hàng, cột thứ ba giờ có tên `thanh_tien`. Bí danh **chỉ đổi tên trong kết quả**, không đổi gì trong bảng gốc. Bảng `order_items` vẫn không có cột nào tên `thanh_tien`.
+
+Cũng chú ý cách trình bày: bài 2 nói 1–2 cột thì viết cùng dòng với `SELECT`. Khi có **biểu thức**, quy ước của khóa học là mỗi cột nằm một dòng riêng, kể cả khi chỉ có 2–3 cột, vì biểu thức dài và cần được nhìn tách bạch.
+
+Từ khóa `AS` thật ra có thể bỏ: `quantity * unit_price thanh_tien` cũng đặt được bí danh. Đó chính là lý do của lỗi thiếu dấu phẩy ở bài trước: `SELECT name city` được database hiểu là `SELECT name AS city`. Khóa học luôn viết `AS` để người đọc thấy rõ đâu là bí danh, đâu là một cột khác.
+
+Bạn cũng có thể đặt bí danh cho cột có sẵn, ví dụ khi muốn kết quả có tên tiếng Việt cho người không biết tiếng Anh đọc:
+
+<Playground>
+```sql
+SELECT name AS ten_san_pham,
+       price AS gia_ban,
+       stock AS ton_kho
+FROM products;
+```
+</Playground>
+
+Kết quả có 12 hàng, 3 cột mang tên `ten_san_pham`, `gia_ban`, `ton_kho`. Dữ liệu y hệt khi chọn `name, price, stock`, chỉ có tiêu đề cột thay đổi.
+
+Trong khóa học, bí danh luôn viết bằng tiếng Việt **không dấu**, chữ thường, nối các từ bằng dấu gạch dưới, giống quy ước đặt tên cột. Lý do nằm ở ghi chú dưới đây.
+
+<Callout type="note" title="Bí danh có dấu cách">
+Bí danh có dấu cách phải đặt trong nháy kép: `name AS "tên sản phẩm"`. Nếu viết `name AS ten san_pham` (không có nháy), database sẽ báo lỗi cú pháp, vì nó không biết chữ `san_pham` đứng sau `ten` để làm gì. Bí danh có dấu tiếng Việt nhưng không có dấu cách, như `name AS tên`, vẫn chạy được. Khóa học chọn kiểu `ten_san_pham` (không dấu, không dấu cách) để thống nhất với tên cột và để gõ nhanh, không phải vì database bắt buộc.
+</Callout>
+
+## Tính toán nhiều bước
+
+Biểu thức có thể kết hợp nhiều cột, nhiều phép toán và cả hằng số (một giá trị cố định như `30000`). Ví dụ, cửa hàng muốn biết giá trị hàng tồn kho của mỗi sản phẩm, tức là số lượng còn nhân với giá bán, và giá sau khi giảm 10%:
+
+<Playground>
+```sql
+SELECT name,
+       stock * price AS gia_tri_ton_kho,
+       price * 90 / 100 AS gia_giam_10
+FROM products;
+```
+</Playground>
+
+Sản phẩm có giá trị tồn kho lớn nhất là cà phê Robusta: 80 cái × 120000 = 9600000 đồng. Bình giữ nhiệt và bánh pía có giá trị tồn kho bằng 0 vì đã hết hàng. Cột `gia_giam_10` cho phin nhôm là 40500, tức 90% của 45000.
+
+Các cột như `gia_tri_ton_kho` hay `thanh_tien` **không được lưu ở đâu cả**. Chúng chỉ tồn tại trong bảng kết quả, và mỗi lần bạn chạy câu lệnh (statement), database tính lại từ dữ liệu hiện tại. Đây chính là lý do không cần thêm cột vào bảng: nếu ngày mai cửa hàng bán bớt Robusta và `stock` giảm xuống, giá trị tồn kho tính ra sẽ tự đúng theo, không có con số cũ nào phải sửa. Đúng như bài 2 đã nói: SQL tạo bảng mới từ bảng cũ, không sửa bảng cũ.
+
+Khi một biểu thức có nhiều phép toán, SQL tính theo **thứ tự ưu tiên** giống toán phổ thông: nhân và chia trước, cộng và trừ sau. Muốn đổi thứ tự thì dùng ngoặc tròn. Ví dụ, khách mua 2 cái và **mỗi cái** được giảm 5000 đồng. Số tiền phải trả là (giá − 5000) × 2:
+
+<Playground>
+```sql
+SELECT name,
+       price,
+       price - 5000 * 2 AS khong_ngoac,
+       (price - 5000) * 2 AS co_ngoac
+FROM products;
+```
+</Playground>
+
+Với phin nhôm giá 45000: cột `co_ngoac` là (45000 − 5000) × 2 = **80000**, đúng số tiền khách phải trả. Cột `khong_ngoac` là **35000**: vì `5000 * 2` được tính trước, database lấy giá của **một** cái trừ đi 10000, thay vì tính tiền hai cái. Khách mua 2 cái phin mà chỉ trả 35000 đồng, ít hơn cả giá một cái, rõ ràng là sai. Hai cột chênh nhau 45000 đồng chỉ vì một cặp ngoặc. Khi không chắc thứ tự tính, hãy cứ thêm ngoặc: ngoặc thừa không làm hại gì, còn thiếu ngoặc có thể làm sai số tiền.
+
+## Bẫy chia số nguyên
+
+Phép chia trong SQLite và PostgreSQL có một điểm làm nhiều người bất ngờ. Giả sử cửa hàng muốn hiển thị giá theo đơn vị "trăm nghìn đồng":
+
+<Playground>
+```sql
+SELECT name,
+       price,
+       price / 100000 AS chia_so_nguyen,
+       price / 100000.0 AS chia_so_thuc
+FROM products;
+```
+</Playground>
+
+Phin nhôm giá 45000 có `chia_so_nguyen` bằng **0**, không phải 0.45. Ly sứ (89000) cũng bằng 0, còn máy xay (450000) bằng 4 thay vì 4.5.
+
+Lý do: `price` là số nguyên (integer) và `100000` cũng là số nguyên. Khi chia **số nguyên cho số nguyên**, SQLite và PostgreSQL trả về **số nguyên**, bỏ đi toàn bộ phần thập phân (không làm tròn: 0.89 thành 0 chứ không thành 1). Chỉ cần một trong hai số là số thập phân, như `100000.0`, kết quả sẽ giữ phần thập phân: cột `chia_so_thuc` cho phin nhôm là 0.45.
+
+Ở ví dụ giảm giá phía trên, `price * 90 / 100` vẫn cho kết quả đúng vì phép nhân làm trước: 45000 × 90 = 4050000, chia 100 được đúng 40500, không có phần dư nào bị mất. Nếu viết `price * (90 / 100)`, phần trong ngoặc là 90 chia 100 bằng 0 theo kiểu số nguyên, và mọi giá đều thành 0.
+
+## Nối chuỗi với ||
+
+Với dữ liệu chữ, toán tử nối chuỗi (concatenation) `||` **ghép** các chuỗi (string) lại với nhau. Chuỗi cố định viết trong nháy đơn:
+
+<Playground>
+```sql
+SELECT name || ' (' || city || ')' AS khach_hang,
+       'Gọi: ' || phone AS lien_he
+FROM customers;
+```
+</Playground>
+
+Cột `khach_hang` ghép tên, một dấu cách, dấu mở ngoặc, thành phố và dấu đóng ngoặc: hàng của chị Hà là `Nguyễn Thu Hà (Hà Nội)`. Chú ý dấu cách nằm **bên trong** nháy đơn `' ('`: SQL không tự thêm dấu cách khi nối.
+
+Cột `lien_he` có điều đáng chú ý: với chị Hà, kết quả là `Gọi: 0912345678`, nhưng với Trần Minh Khoa, kết quả là **NULL**, không phải `Gọi: `. Lý do được giải thích ngay dưới đây.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Phép tính với NULL cho ra NULL">
+Khách số 2 không có số điện thoại, nên `phone` là NULL. Nối `'Gọi: '` với NULL không ra `'Gọi: '`, mà ra NULL. Quy tắc chung: **hầu hết phép tính có NULL tham gia đều cho kết quả NULL**, cả `||` lẫn `+`, `-`, `*`, `/`. Hãy nghĩ NULL là "không biết": "Gọi:" ghép với một số không biết thì kết quả cũng không biết. Bài 7 sẽ dạy cách thay NULL bằng một giá trị mặc định để tránh điều này.
+</Callout>
+
+<Callout type="warn" title="Chia hai số nguyên">
+`price / 100000` bỏ mất phần thập phân, và database **không báo lỗi gì cả**: con số sai trông vẫn rất bình thường. Đây là kiểu lỗi nguy hiểm, vì không có gì báo cho bạn biết. Khi chia, hãy tự hỏi: kết quả có cần phần thập phân không? Nếu có, viết một trong hai số dưới dạng thập phân (`100000.0`), hoặc, nếu biết chắc kết quả chia hết, hãy nhân trước rồi mới chia (như `price * 90 / 100`).
+</Callout>
+
+<Callout type="warn" title="Quên dấu cách khi nối chuỗi">
+`name || city` cho ra `Nguyễn Thu HàHà Nội`, các từ dính liền nhau. SQL không tự chèn dấu cách: bạn phải nối thêm `' '` ở giữa.
+</Callout>
+
+<Callout type="warn" title="Viết chuỗi trong nháy kép">
+Trong SQL chuẩn, **nháy kép dành cho tên** (tên cột, bí danh), **nháy đơn dành cho chuỗi chữ**. SQLite dễ dãi: nếu không có cột nào trùng tên, nó coi `"Gọi: "` là chuỗi và câu lệnh vẫn chạy. Nhưng PostgreSQL sẽ báo `column "Gọi: " does not exist`. Tệ hơn, khi chữ trong nháy kép trùng tên một cột, SQLite lấy **giá trị của cột** chứ không lấy chữ. Chạy thử ô dưới đây:
+</Callout>
+
+<Playground>
+```sql
+SELECT "city" AS nhay_kep,
+       'city' AS nhay_don
+FROM customers;
+```
+</Playground>
+
+Cột `nhay_kep` chứa tên thành phố của từng khách (`Hà Nội`, `TP.HCM`…), vì `"city"` được hiểu là cột `city`. Cột `nhay_don` chứa đúng chữ `city` ở cả 12 hàng, vì `'city'` là một chuỗi. Chỉ khác loại nháy mà kết quả khác hẳn nhau. Quy tắc: chuỗi chữ luôn dùng **nháy đơn**.
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| `7 / 2` | `3` | `3` | `3.5000` |
+| Nối chuỗi | `a \|\| b` | `a \|\| b` | `CONCAT(a, b)` |
+| Tên cột khi không có bí danh | nội dung biểu thức | `?column?` | nội dung biểu thức |
+
+MySQL khác ở hai điểm quan trọng: phép `/` luôn giữ phần thập phân, và `||` mặc định nghĩa là phép "hoặc" logic chứ không phải nối chuỗi. Lộ trình MySQL sẽ nói kỹ; còn trong lộ trình này, bạn dùng `||`.
+
+## Tóm tắt
+
+- Sau `SELECT` có thể viết **biểu thức**: kết hợp cột, hằng số và phép toán `+ - * /`. Database tính biểu thức cho từng hàng.
+- `AS` đặt **bí danh** cho cột trong kết quả. Bí danh không thay đổi bảng gốc.
+- Cột tính toán không được lưu vào bảng; mỗi lần chạy, database tính lại từ dữ liệu hiện tại.
+- Nhân, chia làm trước; cộng, trừ làm sau. Dùng ngoặc tròn để đổi thứ tự, và khi không chắc.
+- Trong SQLite và PostgreSQL, số nguyên chia số nguyên cho ra số nguyên, phần thập phân bị bỏ đi mà không báo lỗi. Dùng `100000.0` khi cần phần thập phân.
+- `||` nối chuỗi; chuỗi cố định viết trong nháy đơn.
+- Phép tính có NULL tham gia thường cho ra NULL.
+
+## Bài tập
+
+<Exercise hint="1 nghìn đồng là bao nhiêu đồng? Kiểm tra xem kết quả có cần phần thập phân không.">
+Cửa hàng muốn in bảng giá theo đơn vị "nghìn đồng". Lấy 2 cột theo thứ tự: tên sản phẩm, và giá tính bằng nghìn đồng (ví dụ phin nhôm 45000 đồng thì cột này là 45).
+
+```sql
+SELECT name,
+       price / 1000 AS gia_nghin
+FROM products;
+```
+</Exercise>
+
+<Exercise hint="Nối name, chuỗi ' - ', rồi category. Nhớ dấu cách nằm trong nháy đơn.">
+Tạo một cột duy nhất mô tả sản phẩm theo mẫu `Tên - Danh mục`, ví dụ `Cà phê phin nhôm - Dụng cụ`. Kết quả chỉ có 1 cột, 12 hàng.
+
+```sql
+SELECT name || ' - ' || category AS mo_ta
+FROM products;
+```
+</Exercise>
+
+<Exercise hint="Phí gói quà cộng vào từng cái, rồi mới nhân với số lượng. Cần ngoặc.">
+Khách mua mỗi loại sản phẩm 3 cái để làm quà, và **mỗi cái** tốn thêm 10000 đồng phí gói quà. Lấy 3 cột theo thứ tự: tên sản phẩm, giá một cái, và tổng tiền cho 3 cái đã gói (ví dụ phin nhôm: (45000 + 10000) × 3 = 165000).
+
+```sql
+SELECT name,
+       price,
+       (price + 10000) * 3 AS tien_3_cai_goi_qua
+FROM products;
+```
+</Exercise>
+
+<Exercise hint="Tính thử phần trong ngoặc: 85 chia 100 bằng bao nhiêu khi cả hai là số nguyên?" starter={"SELECT name,\n       price,\n       price * (85 / 100) AS gia_khuyen_mai\nFROM products;\n"}>
+Cửa hàng chạy khuyến mãi giảm 15%. Câu lệnh có sẵn trong ô muốn lấy 3 cột: tên sản phẩm, giá hiện tại, và giá sau khi giảm. Nhưng cột giá sau khi giảm ra toàn số 0. Hãy sửa để mọi giá sau giảm là số nguyên đúng (ví dụ phin nhôm 45000 thành 38250), giữ nguyên 3 cột.
+
+```sql
+SELECT name,
+       price,
+       price * 85 / 100 AS gia_khuyen_mai
+FROM products;
+```
+</Exercise>
+
+<Exercise hint="Tiền hàng là quantity * unit_price. Phí giao 30000 cộng một lần cho mỗi hàng, sau khi đã nhân.">
+Giả sử mỗi hàng trong `order_items` được giao riêng với phí 30000 đồng. Lấy 3 cột theo thứ tự: `order_id`, `product_id`, và tổng tiền khách phải trả cho hàng đó (tiền hàng cộng phí giao). Ví dụ đơn 1, sản phẩm 2: 2 × 110000 + 30000 = 250000.
+
+```sql
+SELECT order_id,
+       product_id,
+       quantity * unit_price + 30000 AS tong_tien
+FROM order_items;
+```
+</Exercise>
+
+Đến giờ, mọi câu truy vấn của bạn đều trả về **tất cả** các hàng của bảng. Bài tiếp theo sẽ dạy cách chỉ giữ lại những hàng thỏa một điều kiện (condition), ví dụ chỉ những khách ở Hà Nội, bằng mệnh đề (clause) `WHERE`.

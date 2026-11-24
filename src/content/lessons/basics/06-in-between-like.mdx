@@ -1,0 +1,288 @@
+---
+title: IN, BETWEEN và LIKE
+description: Viết gọn điều kiện với danh sách giá trị (IN), khoảng giá trị (BETWEEN), và tìm theo mẫu chữ (LIKE), kèm những khác biệt quan trọng với chữ tiếng Việt.
+order: 6
+---
+
+Ở bài trước, để lấy khách ở Hà Nội hoặc Huế, bạn phải viết `city = 'Hà Nội' OR city = 'Huế'`. Nếu chủ cửa hàng hỏi về năm thành phố, câu lệnh sẽ có năm điều kiện (condition) nối bằng `OR`, dài và dễ gõ sai. Bài trước cũng cho thấy một cái bẫy khi cố viết tắt: `city = 'Hà Nội' OR 'Huế'` chạy được trên SQLite nhưng bỏ sót anh Tuấn ở Huế.
+
+Bài này giới thiệu ba công cụ cho những dạng điều kiện hay gặp. `IN` (một **danh sách** giá trị) và `BETWEEN` (một **khoảng** giá trị) là cách viết gọn cho những điều kiện bạn đã viết được bằng `OR`, `AND`: chúng giúp câu lệnh (statement) ngắn, rõ và ít lỗi hơn. `LIKE` thì làm được một điều mới: tìm chữ theo **mẫu**, ví dụ "tên có chứa 500", việc mà `=` và các phép so sánh khác không làm được.
+
+## IN: thuộc một danh sách
+
+`IN` kiểm tra xem giá trị của một cột (column) có nằm trong một danh sách hay không. Danh sách đặt trong ngoặc tròn, các giá trị cách nhau bởi dấu phẩy:
+
+<Playground>
+```sql
+SELECT name, city
+FROM customers
+WHERE city IN ('Hà Nội', 'Huế', 'Cần Thơ');
+```
+</Playground>
+
+Kết quả (result set) có **6 khách**: 4 khách ở Hà Nội, anh Bùi Anh Tuấn ở Huế, và anh Võ Thanh Tâm ở Cần Thơ. Phần `WHERE` dưới đây (chỉ trích phần điều kiện, không phải câu lệnh đầy đủ) cho kết quả y hệt:
+
+```sql
+WHERE city = 'Hà Nội'
+   OR city = 'Huế'
+   OR city = 'Cần Thơ'
+```
+
+Database hiểu `IN` đúng như vậy: "bằng giá trị thứ nhất, **hoặc** bằng giá trị thứ hai, hoặc…". Nhưng cách viết `IN` ngắn hơn, tên cột chỉ viết một lần, và không thể mắc lỗi viết tắt như ở bài trước. Danh sách có thể chứa số, chữ hay ngày, miễn cùng loại với cột đang so sánh.
+
+`NOT IN` làm ngược lại: giữ những hàng (row) có giá trị **không** nằm trong danh sách.
+
+<Playground>
+```sql
+SELECT name, city
+FROM customers
+WHERE city NOT IN ('Hà Nội', 'TP.HCM');
+```
+</Playground>
+
+Kết quả có **5 khách**: 2 ở Đà Nẵng (Lê Bảo Ngọc, Trịnh Quang Vinh), và mỗi nơi 1 khách ở Cần Thơ, Huế, Hải Phòng. Cửa hàng có 12 khách; bỏ 4 khách Hà Nội và 3 khách TP.HCM, còn lại đúng 5.
+
+<Callout type="note" title="NOT IN và NULL">
+Cột `city` không có NULL nên `NOT IN` ở trên cho kết quả đúng như dự đoán. Như bạn đã thấy ở bài 4 và 5, hàng có NULL không qua được phép so sánh nào, và `NOT IN` cũng vậy. Bài 7 sẽ giải thích; bài 20 sẽ chỉ ra một cái bẫy nặng hơn khi danh sách của `NOT IN` chứa NULL.
+</Callout>
+
+## BETWEEN: nằm trong một khoảng
+
+`BETWEEN a AND b` kiểm tra xem giá trị có nằm trong khoảng từ `a` tới `b` hay không, **tính cả hai đầu**:
+
+<Playground>
+```sql
+SELECT name, price
+FROM products
+WHERE price BETWEEN 89000 AND 145000;
+```
+</Playground>
+
+Kết quả có **4 sản phẩm**: ly sứ men lam (89000), Robusta (120000), trà ô long (140000) và cà phê Culi (145000). Chú ý ly sứ giá **đúng bằng** 89000 và Culi giá **đúng bằng** 145000, cả hai vẫn được giữ. `BETWEEN 89000 AND 145000` chính là cách viết gọn của phần điều kiện sau:
+
+```sql
+WHERE price >= 89000
+  AND price <= 145000
+```
+
+Hai đầu phải viết theo thứ tự **nhỏ trước, lớn sau**. `BETWEEN 145000 AND 89000` không báo lỗi, nhưng không có giá nào vừa lớn hơn hoặc bằng 145000 vừa nhỏ hơn hoặc bằng 89000, nên kết quả rỗng.
+
+`NOT BETWEEN` giữ những giá trị nằm **ngoài** khoảng: với khoảng trên, đó là 8 sản phẩm còn lại, gồm cả những món rẻ hơn 89000 và những món đắt hơn 145000.
+
+### BETWEEN với ngày tháng
+
+`BETWEEN` cũng dùng được với ngày. Các đơn đặt trong tháng 6 năm 2025:
+
+<Playground>
+```sql
+SELECT id, ordered_on
+FROM orders
+WHERE ordered_on BETWEEN '2025-06-01' AND '2025-06-30';
+```
+</Playground>
+
+Kết quả có **2 đơn**: đơn 6 (ngày 2025-06-12) và đơn 7 (ngày 2025-06-30). Đơn 7 đặt đúng ngày cuối khoảng và vẫn được giữ, vì `BETWEEN` tính cả hai đầu.
+
+Câu này đúng vì cột `ordered_on` chỉ chứa ngày, không có giờ. Bài 5 đã giới thiệu cách viết khoảng `ordered_on >= '2025-06-01' AND ordered_on < '2025-07-01'` ("từ mốc A, tới trước mốc B"). Với cột chỉ có ngày, hai cách cho kết quả như nhau.
+
+Nhưng khi bạn gặp cột có cả ngày lẫn giờ, `BETWEEN ... AND '2025-06-30'` có thể bỏ sót những đơn đặt **trong** ngày 30. Bài 26 sẽ nói kỹ về các kiểu dữ liệu (data type) ngày giờ; ở đây chỉ cần hiểu vì sao.
+
+Lý do khác nhau tùy database:
+
+- **Trên SQLite**, ngày giờ được lưu như chữ (bài 4). `'2025-06-30 14:00'` có cùng phần đầu với `'2025-06-30'` nhưng dài hơn, nên khi so chữ nó đứng **sau** `'2025-06-30'` và rơi ra ngoài khoảng. Kể cả một đơn ghi đúng `'2025-06-30 00:00'` cũng bị loại vì lý do này.
+- **Trên PostgreSQL và MySQL**, `'2025-06-30'` được hiểu là thời điểm 0 giờ ngày 30, nên mọi thời điểm sau 0 giờ trong ngày đó đều lớn hơn mốc và bị loại.
+
+Cách nào thì kết quả cũng là đơn đặt trong ngày cuối bị bỏ sót, còn điều kiện `< '2025-07-01'` thì đúng trên cả ba database.
+
+Dataset không có cột chứa giờ, nhưng bạn có thể **giả lập** bằng cách nối thêm `' 14:00'` vào ngày đặt (phép nối của bài 3), coi như mọi đơn được đặt lúc 14 giờ:
+
+<Playground>
+```sql
+SELECT id,
+       ordered_on || ' 14:00' AS thoi_diem
+FROM orders
+WHERE ordered_on || ' 14:00' BETWEEN '2025-06-01' AND '2025-06-30';
+```
+</Playground>
+
+Kết quả chỉ có **1 đơn** (đơn 6, lúc `2025-06-12 14:00`). Đơn 7 đặt ngày 30 tháng 6 biến mất, dù rõ ràng nó thuộc tháng 6. Đổi điều kiện thành `ordered_on || ' 14:00' >= '2025-06-01' AND ordered_on || ' 14:00' < '2025-07-01'` rồi chạy lại: đơn 7 quay về, kết quả có đủ 2 đơn.
+
+Cách viết "tới trước ngày đầu tháng sau" không bao giờ gặp vấn đề đó, nên nhiều người làm nghề luôn dùng nó cho khoảng thời gian.
+
+## LIKE: tìm theo mẫu chữ
+
+`=` chỉ khớp khi hai chuỗi giống hệt nhau. Khi cần tìm "tên bắt đầu bằng…", "email chứa…", bạn dùng `LIKE` với một **mẫu** (pattern). Trong mẫu có hai ký tự đặc biệt, gọi là **ký tự đại diện** (wildcard):
+
+| Ký tự | Ý nghĩa | Ví dụ mẫu | Khớp với |
+|---|---|---|---|
+| `%` | một chuỗi bất kỳ, kể cả rỗng | `'Trà%'` | Trà ô long 200g, Trà sen Tây Hồ 100g… |
+| `_` | đúng **một** ký tự bất kỳ | `'_à%'` | Cà phê phin nhôm, Cà phê Robusta… (ký tự thứ hai là "à") |
+
+Vị trí của `%` quyết định bạn tìm gì:
+
+<Playground>
+```sql
+-- Bắt đầu bằng "Trà"
+SELECT name
+FROM products
+WHERE name LIKE 'Trà%';
+
+-- Chứa "500" ở bất kỳ đâu
+SELECT name
+FROM products
+WHERE name LIKE '%500%';
+
+-- Kết thúc bằng chữ "g"
+SELECT name
+FROM products
+WHERE name LIKE '%g';
+```
+</Playground>
+
+Ô này trả về ba bảng kết quả:
+
+- `'Trà%'`: **3 sản phẩm** trà (ô long, sen Tây Hồ, shan tuyết). `%` ở cuối nghĩa là "sau chữ Trà là gì cũng được".
+- `'%500%'`: **3 sản phẩm** có chuỗi "500" trong tên: Robusta 500g, Culi 500g và bình giữ nhiệt 500ml. `%` ở cả hai đầu nghĩa là "chứa ở đâu cũng được".
+- `'%g'`: **8 sản phẩm** có tên kết thúc bằng chữ "g", tức những sản phẩm ghi khối lượng (500g, 250g, 200g, 100g), cộng với **bánh pía sầu riêng** và **bánh đậu xanh Hải Dương**, vì "riêng" và "Dương" cũng kết thúc bằng "g". Mẫu chữ chỉ so ký tự, không hiểu ý bạn. Đọc kỹ kết quả là cách chắc chắn nhất để phát hiện những hàng lọt vào ngoài ý muốn.
+
+Ký tự `_` hữu ích khi bạn biết chính xác số ký tự. Ví dụ `'Trà ___ %'` tìm tên có dạng "Trà", một dấu cách, đúng 3 ký tự, một dấu cách, rồi bất kỳ: chỉ **trà sen Tây Hồ 100g** khớp, vì "sen" có đúng 3 ký tự và theo sau là một dấu cách. "Trà ô long" không khớp: ba dấu `_` lấy được "ô l" (3 ký tự, gồm cả dấu cách), nhưng ký tự tiếp theo là "o" chứ không phải dấu cách mà mẫu yêu cầu. `_` không biết đâu là một từ, nó chỉ đếm ký tự.
+
+<Callout type="try">
+Trong ô ba câu ở trên, thay một mẫu bằng `'Trà ___ %'` rồi chạy: chỉ có 1 hàng. Sau đó thử `'Trà _ %'`: lần này trà ô long khớp, vì "ô" đúng 1 ký tự.
+</Callout>
+
+Giống `NOT IN` và `NOT BETWEEN`, `LIKE` cũng có dạng phủ định `NOT LIKE`.
+
+## LIKE và chữ hoa, chữ thường
+
+Đây là một chỗ ba database khác nhau rõ rệt, và với chữ tiếng Việt, khác biệt càng rõ. Chạy thử trên SQLite:
+
+<Playground>
+```sql
+SELECT name
+FROM products
+WHERE name LIKE 'cà phê%';
+
+SELECT name
+FROM products
+WHERE name LIKE 'CÀ PHÊ%';
+```
+</Playground>
+
+Câu đầu trả về **4 sản phẩm** (phin nhôm, Robusta, Arabica, Culi), dù trong bảng (table) tên viết "Cà phê" với chữ C hoa. Câu thứ hai trả về **0 hàng**.
+
+Lý do: `LIKE` của SQLite bỏ qua hoa thường, nhưng **chỉ với chữ cái không dấu** (a–z). "c" và "C" được coi như nhau, nên câu đầu khớp. Nhưng "à" và "À", "ê" và "Ê" bị coi là hai ký tự khác nhau, nên `'CÀ PHÊ%'` không khớp với "Cà phê".
+
+Ở hai database còn lại:
+
+- **PostgreSQL**: `LIKE` phân biệt hoa thường (case-sensitive) hoàn toàn, nên cả hai câu trên đều ra 0 hàng. PostgreSQL có thêm từ khóa (keyword) `ILIKE` (chữ I là *insensitive*, không phân biệt), bỏ qua hoa thường cho cả chữ có dấu: `name ILIKE 'CÀ PHÊ%'` trả về đủ 4 sản phẩm.
+- **MySQL 8**: với cài đặt mặc định, `LIKE` bỏ qua cả hoa thường lẫn dấu, nên `'ca phe%'` cũng khớp "Cà phê". Lộ trình MySQL sẽ nói về thiết lập quyết định điều này.
+
+Bài học thực tế: khi tìm theo mẫu chữ tiếng Việt, **viết mẫu đúng như dữ liệu được lưu**, cả hoa thường lẫn dấu. Đó là cách an toàn nhất để mẫu khớp được dữ liệu trên mọi database.
+
+## Kết hợp với AND, OR, NOT
+
+`IN`, `BETWEEN`, `LIKE` là những điều kiện như mọi điều kiện khác, nên bạn kết hợp chúng bằng `AND`, `OR`, `NOT` như ở bài 5:
+
+<Playground>
+```sql
+SELECT name,
+       category,
+       price
+FROM products
+WHERE category IN ('Trà', 'Cà phê')
+  AND price BETWEEN 130000 AND 200000;
+```
+</Playground>
+
+Kết quả có **3 sản phẩm**: Arabica (165000), trà ô long (140000) và Culi (145000). Cả hai đầu của khoảng đều có tác dụng: đầu dưới loại Robusta (120000), đầu trên loại trà sen Tây Hồ và trà shan tuyết. Đây là cùng dạng câu hỏi "trà hoặc cà phê, kèm điều kiện về giá" ở bài trước. Điểm khác chính là không cần ngoặc: `IN` đã gói phần "hoặc" lại thành một điều kiện duy nhất, nên không còn chỗ cho lỗi thứ tự `AND`/`OR`.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Quên ký tự đại diện trong LIKE">
+`WHERE name LIKE 'Trà'` không có `%` nên chỉ khớp với tên **đúng bằng** "Trà", và trả về 0 hàng. `LIKE` không có `%` hay `_` thì mẫu phải khớp **cả chuỗi**, gần giống `=`. Khác biệt còn lại là chuyện hoa thường ở phần trên: trên SQLite, `'Tra' LIKE 'tra'` đúng nhưng `'Tra' = 'tra'` sai. Nếu kết quả rỗng một cách lạ, hãy kiểm tra xem mẫu đã có `%` ở đúng chỗ chưa.
+</Callout>
+
+<Callout type="warn" title="Viết ngược hai đầu của BETWEEN">
+`BETWEEN 145000 AND 89000` không báo lỗi mà trả về 0 hàng. Luôn viết giá trị nhỏ trước. Với ngày cũng vậy: ngày sớm trước, ngày muộn sau.
+</Callout>
+
+<Callout type="warn" title="Mẫu chữ khớp nhiều hơn ý muốn">
+`'%g'` lấy được cả "Bánh pía sầu riêng". Tương tự, tìm khách tên "Anh" bằng `'%Anh%'` trên SQLite ra **3 khách**: Hoàng Mai **Anh**, Bùi **Anh** Tuấn, và cả Võ Th**anh** Tâm, vì "anh" nằm trong "Thanh" và `LIKE` của SQLite bỏ qua hoa thường với chữ không dấu. Trên PostgreSQL, `LIKE` phân biệt hoa thường nên chỉ ra Hoàng Mai Anh và Bùi Anh Tuấn. Một mẫu càng ngắn càng dễ khớp nhầm. Sau khi chạy, hãy đọc từng hàng trong kết quả để chắc mỗi hàng đúng là thứ bạn cần.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL 8 (mặc định) |
+|---|---|---|---|
+| `'Cà phê' LIKE 'cà phê%'` | đúng | sai | đúng |
+| `'Cà phê' LIKE 'CÀ PHÊ%'` | sai | sai | đúng |
+| `'Cà phê' LIKE 'ca phe%'` (không dấu) | sai | sai | đúng |
+| `ILIKE` (bỏ qua hoa thường) | không có | có | không có |
+
+## Tóm tắt
+
+- `IN (a, b, c)`: thuộc danh sách, là cách viết gọn của chuỗi `= … OR = …`. `NOT IN` là phủ định.
+- `BETWEEN a AND b`: nằm trong khoảng, **tính cả hai đầu**, `a` phải nhỏ hơn hoặc bằng `b`. `NOT BETWEEN` là phủ định.
+- Với khoảng thời gian, `cột >= ngày đầu AND cột < ngày đầu kỳ sau` an toàn hơn `BETWEEN` khi cột có cả giờ.
+- `LIKE` tìm theo mẫu: `%` là chuỗi bất kỳ (kể cả rỗng), `_` là đúng một ký tự. Không có ký tự đại diện thì mẫu phải khớp cả chuỗi.
+- Hoa thường trong `LIKE` khác nhau giữa các database. SQLite chỉ bỏ qua hoa thường với chữ không dấu; PostgreSQL phân biệt (dùng `ILIKE` để bỏ qua); MySQL mặc định bỏ qua cả hoa thường lẫn dấu. Viết mẫu đúng như dữ liệu được lưu.
+- `IN`, `BETWEEN`, `LIKE` kết hợp được với `AND`, `OR`, `NOT`. `IN` giúp tránh lỗi thứ tự `AND`/`OR`.
+
+## Bài tập
+
+<Exercise hint="BETWEEN tính cả hai đầu. Cột ngày đăng ký nằm ở bảng khách hàng.">
+Lấy những khách đăng ký trong nửa đầu năm 2025 (từ ngày 2025-01-01 tới ngày 2025-06-30, tính cả hai ngày) bằng `BETWEEN`. Kết quả gồm 2 cột theo thứ tự: tên khách, ngày đăng ký.
+
+```sql
+SELECT name, joined_on
+FROM customers
+WHERE joined_on BETWEEN '2025-01-01' AND '2025-06-30';
+```
+</Exercise>
+
+<Exercise hint="Đầu số cần tìm nằm ở đầu chuỗi. Ký tự % đặt ở đâu?">
+Cửa hàng chạy khuyến mãi riêng cho thuê bao có đầu số "098". Lấy tên và số điện thoại của những khách có số bắt đầu bằng "098". Kết quả gồm 2 cột theo thứ tự: `name`, `phone`.
+
+```sql
+SELECT name, phone
+FROM customers
+WHERE phone LIKE '098%';
+```
+</Exercise>
+
+<Exercise hint="Hai điều kiện: khoảng giá (tính cả hai mức) và tên có chứa '500'. Mẫu chứa '500' ở bất kỳ đâu cần % ở mấy phía?">
+Tìm sản phẩm có giá từ 130000 tới 200000 đồng (tính cả hai mức) và trong tên có chữ "500". Kết quả gồm 2 cột theo thứ tự: `name`, `price`.
+
+```sql
+SELECT name, price
+FROM products
+WHERE price BETWEEN 130000 AND 200000
+  AND name LIKE '%500%';
+```
+</Exercise>
+
+<Exercise hint="Câu có sẵn thiếu ký tự đại diện, nên mẫu phải khớp nguyên cả tên. Cẩn thận: 500ml không phải 500g." starter={"SELECT name, price\nFROM products\nWHERE name LIKE '500g';\n"}>
+Câu lệnh có sẵn trong ô muốn lấy các sản phẩm có tên **kết thúc bằng** "500g", nhưng lại trả về 0 hàng. Hãy sửa để kết quả đúng, giữ nguyên 2 cột `name`, `price`.
+
+```sql
+SELECT name, price
+FROM products
+WHERE name LIKE '%500g';
+```
+</Exercise>
+
+<Exercise hint="Hai trạng thái cần lấy đặt trong một danh sách sau IN. Khoảng ngày dùng BETWEEN, tính cả hai ngày.">
+Lấy các đơn **đang giao** hoặc **đã hủy** được đặt từ ngày 2025-09-01 tới ngày 2025-11-05 (tính cả hai ngày). Kết quả gồm 3 cột theo thứ tự: `id`, `status`, `ordered_on`.
+
+```sql
+SELECT id,
+       status,
+       ordered_on
+FROM orders
+WHERE status IN ('đang giao', 'đã hủy')
+  AND ordered_on BETWEEN '2025-09-01' AND '2025-11-05';
+```
+</Exercise>
+
+Bài tiếp theo dành trọn cho NULL, thứ bạn đã gặp nhiều lần qua các bài: vì sao `= NULL` không bao giờ đúng, cách kiểm tra NULL đúng, và cách thay NULL bằng một giá trị mặc định.

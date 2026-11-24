@@ -1,0 +1,114 @@
+---
+import Base from '../../layouts/Base.astro';
+import { tracks, trackById, plannedLessons } from '../../data/tracks';
+import { lessonsByTrack, urlOf, type Lesson } from '../../lib/lessons';
+import { withBase } from '../../lib/url';
+
+export function getStaticPaths() {
+  return tracks.map((t) => ({ params: { track: t.id } }));
+}
+
+const track = trackById(Astro.params.track!)!;
+const written = new Map((await lessonsByTrack(track.id)).map((l: Lesson) => [l.id, l]));
+const plan = plannedLessons(track.id);
+
+// Gom bài theo module, giữ đúng thứ tự trong lộ trình
+const modules: { name: string; lessons: typeof plan }[] = [];
+for (const l of plan) {
+  const last = modules.at(-1);
+  if (last && last.name === l.module) last.lessons.push(l);
+  else modules.push({ name: l.module, lessons: [l] });
+}
+const requires = track.requires.map((id) => trackById(id)!).filter(Boolean);
+---
+
+<Base title={`${track.name} | Học SQL`} description={track.summary} current={track.id}>
+  <main id="main" class="wrap track">
+    <h1>{track.name}</h1>
+    <p class="summary">
+      {track.summary}. {plan.length} bài, đã có {written.size}.
+      {requires.length > 0 && (
+        <>Nên học trước: {requires.map((r, i) => <>{i > 0 && ', '}<a href={withBase(`/${r.id}/`)}>{r.name}</a></>)}.</>
+      )}
+    </p>
+
+    {modules.map((m) => (
+      <section class="module" aria-labelledby={`m-${m.lessons[0].order}`}>
+        <h2 id={`m-${m.lessons[0].order}`}>{m.name}</h2>
+        <ol class="lessons">
+          {m.lessons.map((l) => {
+            const entry = written.get(l.id);
+            return (
+              <li class={entry ? undefined : 'is-planned'}>
+                {entry ? (
+                  <a href={urlOf(entry)} data-astro-prefetch>
+                    <span class="n">{l.order}</span>
+                    <span class="t">{l.title}</span>
+                    <span class="d">{entry.data.description}</span>
+                  </a>
+                ) : (
+                  <div class="row">
+                    <span class="n">{l.order}</span>
+                    <span class="t">{l.title} <span class="soon">Sắp có</span></span>
+                    <span class="d">{l.objectives[0]}</span>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+    ))}
+  </main>
+</Base>
+
+<style>
+  .track { padding-block: clamp(2rem, 5vw, 4rem) var(--space-8); }
+  .track > * { max-width: 46rem; }
+  h1 { font-size: var(--step-3); letter-spacing: -0.02em; line-height: 1.15; margin: 0 0 var(--space-2); }
+  .summary { color: var(--ink-soft); margin: 0 0 var(--space-6); }
+  .module + .module { margin-top: var(--space-6); }
+  h2 {
+    font-size: var(--step-0);
+    font-weight: 600;
+    margin: 0 0 var(--space-2);
+    color: var(--ink);
+  }
+  .lessons {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-top: 1px solid var(--rule);
+  }
+  .lessons li { border-bottom: 1px solid var(--rule); }
+  .lessons a,
+  .lessons .row {
+    display: grid;
+    grid-template-columns: 2.25rem 1fr;
+    gap: 0.15rem var(--space-2);
+    padding: var(--space-3) var(--space-2);
+    text-decoration: none;
+    border-radius: var(--radius-s);
+  }
+  .n {
+    grid-row: span 2;
+    font-family: var(--font-code);
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+    padding-top: 0.15rem;
+  }
+  .lessons a:hover { background: var(--surface); }
+  .t { font-weight: 600; }
+  .d { color: var(--ink-soft); font-size: var(--step--1); }
+  .is-planned .t { font-weight: 500; color: var(--ink-soft); }
+  .soon {
+    margin-left: var(--space-2);
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 0.05rem 0.4rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: 999px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+</style>

@@ -1,0 +1,80 @@
+---
+// Sơ đồ quan hệ 4 bảng của dataset shop. Dùng trong MDX: <ShopDiagram />
+// Lưu ý: id trong SVG (schema-title, schema-desc, schema-arrow) cố định, nên mỗi trang chỉ dùng component này một lần.
+// Màu lấy từ token trong global.css nên tự đổi theo giao diện sáng/tối.
+type Col = { name: string; tag?: 'PK' | 'FK' | 'PK, FK' };
+type Box = { table: string; x: number; cols: Col[] };
+
+const Y = 20, HEAD = 34, ROW = 25, W = 170;
+const boxes: Box[] = [
+  { table: 'customers', x: 30, cols: [
+    { name: 'id', tag: 'PK' }, { name: 'name' }, { name: 'city' }, { name: 'email' },
+    { name: 'phone' }, { name: 'referred_by', tag: 'FK' }, { name: 'joined_on' } ] },
+  { table: 'orders', x: 250, cols: [
+    { name: 'id', tag: 'PK' }, { name: 'customer_id', tag: 'FK' }, { name: 'ordered_on' },
+    { name: 'status' }, { name: 'shipped_on' } ] },
+  { table: 'order_items', x: 470, cols: [
+    { name: 'order_id', tag: 'PK, FK' }, { name: 'product_id', tag: 'PK, FK' },
+    { name: 'quantity' }, { name: 'unit_price' } ] },
+  { table: 'products', x: 690, cols: [
+    { name: 'id', tag: 'PK' }, { name: 'name' }, { name: 'category' }, { name: 'price' }, { name: 'stock' } ] },
+];
+const mid = (i: number) => Y + HEAD + ROW * i + ROW / 2;
+// Mũi tên: từ cột khóa ngoại tới cột khóa chính được tham chiếu.
+const links = [
+  { d: `M30,${mid(5)} H14 V${mid(0)} H26`, label: 'referred_by → customers.id' },
+  { d: `M250,${mid(1)} H230 V${mid(0)} H204`, label: 'orders.customer_id → customers.id' },
+  { d: `M470,${mid(0)} H424`, label: 'order_items.order_id → orders.id' },
+  { d: `M640,${mid(1)} H665 V${mid(0)} H686`, label: 'order_items.product_id → products.id' },
+];
+---
+
+<figure class="schema">
+  <div class="schema-scroll">
+    <svg viewBox="0 0 875 250" role="img" aria-labelledby="schema-title schema-desc">
+      <title id="schema-title">Sơ đồ quan hệ của dataset cửa hàng</title>
+      <desc id="schema-desc">
+        Bốn bảng customers, orders, order_items, products. orders.customer_id trỏ tới customers.id;
+        customers.referred_by trỏ tới customers.id; order_items.order_id trỏ tới orders.id;
+        order_items.product_id trỏ tới products.id. Khóa chính của order_items là cặp (order_id, product_id).
+      </desc>
+      <defs>
+        <marker id="schema-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="schema-arrowhead" />
+        </marker>
+      </defs>
+      {boxes.map((b) => (
+        <g>
+          <rect x={b.x} y={Y} width={W} height={HEAD + ROW * b.cols.length + 6} rx="6" class="schema-box" />
+          <path d={`M${b.x},${Y + HEAD} H${b.x + W}`} class="schema-sep" />
+          <text x={b.x + 12} y={Y + 23} class="schema-table">{b.table}</text>
+          {b.cols.map((c, i) => (
+            <g>
+              <text x={b.x + 12} y={mid(i) + 4} class={c.tag?.startsWith('PK') ? 'schema-col schema-pk' : 'schema-col'}>{c.name}</text>
+              {c.tag && <text x={b.x + W - 10} y={mid(i) + 4} text-anchor="end" class="schema-tag">{c.tag}</text>}
+            </g>
+          ))}
+        </g>
+      ))}
+      {links.map((l) => (
+        <path d={l.d} class="schema-link" marker-end="url(#schema-arrow)"><title>{l.label}</title></path>
+      ))}
+    </svg>
+  </div>
+  <figcaption>Mũi tên đi từ cột khóa ngoại (FK) tới cột khóa chính (PK) mà nó trỏ tới. Trên điện thoại, kéo ngang để xem đủ.</figcaption>
+</figure>
+
+<style>
+  .schema { margin: 1.5rem 0; }
+  .schema-scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--radius-m); background: var(--paper); }
+  .schema svg { display: block; width: 100%; min-width: 640px; height: auto; }
+  .schema-box { fill: var(--surface); stroke: var(--rule-strong); stroke-width: 1; }
+  .schema-sep { stroke: var(--rule-strong); stroke-width: 1; }
+  .schema-table { fill: var(--ink); font: 700 17px var(--font-text); }
+  .schema-col { fill: var(--ink); font: 400 15px var(--font-code); }
+  .schema-pk { font-weight: 700; text-decoration: underline; }
+  .schema-tag { fill: var(--ink-soft); font: 600 14px var(--font-text); }
+  .schema-link { fill: none; stroke: var(--info); stroke-width: 1.6; }
+  .schema-arrowhead { fill: var(--info); }
+  figcaption { margin-top: 0.5rem; color: var(--ink-soft); font-size: 0.9rem; }
+</style>

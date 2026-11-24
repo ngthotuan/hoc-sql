@@ -1,0 +1,35 @@
+---
+// Dùng trong MDX (giữ nguyên thụt lề của SQL):
+//
+//   <Playground>
+//   ```sql
+//   SELECT name
+//   FROM products
+//   WHERE price > 100000;
+//   ```
+//   </Playground>
+//
+//   <Playground engine="postgres"> … </Playground>   lộ trình PostgreSQL
+//   <Playground expect="error"> … </Playground>       câu lệnh cố ý gây lỗi để minh họa
+//
+// Không truyền SQL qua thuộc tính code={`...`}: MDX xóa thụt lề trong đó.
+// client:visible → JS của playground chỉ tải khi cuộn tới.
+import Island from './Playground.tsx';
+import type { EngineId } from '../data/tracks';
+import { codeFromHtml } from '../lib/code-from-html';
+
+interface Props {
+  engine?: EngineId;
+  dataset?: string;
+  /** "error": câu lệnh cố ý gây lỗi để minh họa (npm run validate đòi nó phải lỗi) */
+  expect?: 'error';
+}
+const { engine = 'sqlite', dataset = 'shop' } = Astro.props;
+
+const code = Astro.slots.has('default') ? codeFromHtml(await Astro.slots.render('default')) : '';
+if (!code) {
+  throw new Error(`<Playground> trống trong ${Astro.url.pathname}: hãy đặt một khối \`\`\`sql bên trong.`);
+}
+---
+
+<Island client:visible engine={engine} dataset={dataset} code={code} />

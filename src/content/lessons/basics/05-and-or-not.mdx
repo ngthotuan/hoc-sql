@@ -1,0 +1,265 @@
+---
+title: "Kết hợp điều kiện: AND, OR, NOT"
+description: Lọc theo nhiều điều kiện cùng lúc bằng AND, OR, NOT, hiểu vì sao AND được tính trước OR, và dùng ngoặc để câu lệnh làm đúng điều bạn muốn.
+order: 5
+---
+
+Chủ cửa hàng cần chọn quà tặng cho khách quen: một món **dụng cụ pha cà phê** có giá **dưới 100000 đồng**. Ở bài trước, mỗi câu truy vấn (query) của bạn chỉ lọc theo một điều kiện. Lọc theo danh mục thì ra cả máy xay 450000 đồng; lọc theo giá thì ra cả bánh pía. Câu hỏi này cần **hai điều kiện cùng lúc**.
+
+Bài này dạy ba từ khóa (keyword) để kết hợp điều kiện (condition): `AND`, `OR` và `NOT`. Chúng ngắn và dễ đọc, nhưng có một quy tắc về thứ tự tính mà nếu không nắm, bạn sẽ nhận về kết quả sai mà không hề có thông báo lỗi nào.
+
+## AND: mọi điều kiện đều phải đúng
+
+`AND` nối hai điều kiện; một hàng (row) chỉ được giữ khi **cả hai** điều kiện đều đúng với hàng đó:
+
+<Playground>
+```sql
+SELECT name,
+       category,
+       price
+FROM products
+WHERE category = 'Dụng cụ'
+  AND price < 100000;
+```
+</Playground>
+
+Kết quả (result set) có **2 hàng**: phin nhôm (45000 đồng) và ly sứ men lam (89000 đồng). Danh mục Dụng cụ có 4 sản phẩm, nhưng bình giữ nhiệt (215000) và máy xay (450000) bị loại vì không thỏa điều kiện giá. Ngược lại, bánh pía (75000) và bánh đậu xanh (55000) rẻ nhưng bị loại vì không thuộc danh mục Dụng cụ.
+
+Chú ý cách trình bày: `AND` xuống dòng và thụt vào sao cho chữ `AND` kết thúc thẳng cột với chữ `WHERE` (với `OR`, ngắn hơn một ký tự, thụt thêm một dấu cách). Mỗi điều kiện nằm trên một dòng riêng nên bạn đọc được ngay câu lệnh (statement) lọc theo những gì.
+
+Bạn có thể nối nhiều `AND` liên tiếp. Ví dụ, khách đăng ký trong năm 2024 và không ở Hà Nội:
+
+<Playground>
+```sql
+SELECT name,
+       city,
+       joined_on
+FROM customers
+WHERE joined_on >= '2024-01-01'
+  AND joined_on < '2025-01-01'
+  AND city <> 'Hà Nội';
+```
+</Playground>
+
+Kết quả có **4 khách**: Trần Minh Khoa, Lê Bảo Ngọc, Phạm Quốc Huy và Võ Thanh Tâm. Chị Nguyễn Thu Hà cũng đăng ký năm 2024 (ngày 2024-02-11), nhưng bị loại vì ở Hà Nội. Hai điều kiện đầu tạo thành một **khoảng thời gian**: từ ngày 2024-01-01 (tính cả ngày này) tới trước ngày 2025-01-01. Viết khoảng theo kiểu "từ mốc A, tới trước mốc B" như vậy giúp bạn không phải nhớ ngày cuối của kỳ: lọc tháng 2 thì viết `>= '2024-02-01' AND < '2024-03-01'`, không cần biết năm đó tháng 2 có 28 hay 29 ngày. Cách viết này còn đúng cả khi cột có cả ngày lẫn giờ, điều bài 6 sẽ nói thêm.
+
+## OR: chỉ cần một điều kiện đúng
+
+`OR` giữ lại hàng khi **ít nhất một** trong các điều kiện đúng:
+
+<Playground>
+```sql
+SELECT name, city
+FROM customers
+WHERE city = 'Hà Nội'
+   OR city = 'Huế';
+```
+</Playground>
+
+Kết quả có **5 khách**: 4 khách ở Hà Nội và anh Bùi Anh Tuấn ở Huế. Mỗi khách chỉ cần thỏa một trong hai điều kiện là được giữ.
+
+`OR` trong SQL là "hoặc" theo nghĩa **bao gồm**: nếu một hàng thỏa cả hai điều kiện, nó vẫn được giữ (và chỉ xuất hiện một lần). Ví dụ `WHERE category = 'Trà' OR price > 200000`: trà sen Tây Hồ vừa là trà vừa đắt hơn 200000 đồng, và nó xuất hiện đúng một lần trong kết quả.
+
+## Bảng chân trị
+
+Để thấy rõ `AND` và `OR` hoạt động thế nào, hãy xem mọi khả năng khi kết hợp hai điều kiện A và B. Bảng này gọi là **bảng chân trị** (truth table):
+
+| A | B | A AND B | A OR B |
+|---|---|---|---|
+| đúng | đúng | **đúng** | **đúng** |
+| đúng | sai | sai | **đúng** |
+| sai | đúng | sai | **đúng** |
+| sai | sai | sai | sai |
+
+Cách nhớ: `AND` khó tính, chỉ đúng khi mọi thứ đều đúng. `OR` dễ tính, chỉ sai khi mọi thứ đều sai. Vì vậy thêm điều kiện bằng `AND` luôn làm kết quả **ít đi hoặc giữ nguyên**, còn thêm bằng `OR` luôn làm kết quả **nhiều lên hoặc giữ nguyên**. Khi kết quả có số hàng khác hẳn với dự đoán, hãy kiểm tra xem mình có dùng nhầm `AND` với `OR` không.
+
+## NOT: đảo ngược điều kiện
+
+`NOT` đặt trước một điều kiện để **đảo ngược** nó: đúng thành sai, sai thành đúng. Ví dụ, tìm những sản phẩm không phải đồ uống, tức không thuộc danh mục Trà cũng không thuộc Cà phê:
+
+<Playground>
+```sql
+SELECT name, category
+FROM products
+WHERE NOT (category = 'Trà' OR category = 'Cà phê');
+```
+</Playground>
+
+Kết quả có **6 sản phẩm**: 4 dụng cụ và 2 loại bánh. Phần trong ngoặc đúng với 6 sản phẩm trà và cà phê; `NOT` đảo lại, nên giữ đúng 6 sản phẩm còn lại.
+
+Câu lệnh trên có thể viết theo cách khác mà kết quả y hệt:
+
+```sql
+WHERE category <> 'Trà'
+  AND category <> 'Cà phê'
+```
+
+"Không phải (trà hoặc cà phê)" cũng chính là "không phải trà **và** không phải cà phê". Chú ý `OR` đã đổi thành `AND` khi `NOT` được đưa vào trong. Quy tắc này có tên là **định luật De Morgan**: `NOT (A OR B)` bằng `NOT A AND NOT B`, và `NOT (A AND B)` bằng `NOT A OR NOT B`. Bạn không cần nhớ tên, nhưng nên nhớ rằng khi phủ định một nhóm điều kiện, `AND` và `OR` đổi chỗ cho nhau.
+
+<Callout type="note" title="Một điều lạ để dành cho bài 7">
+Cửa hàng có 12 khách. Câu `WHERE NOT email = 'ha.nguyen@example.com'` loại chị Hà, nên bạn sẽ đoán kết quả có 11 khách. Thật ra chỉ có **9**. Hai khách bị "mất" là Phạm Quốc Huy và Ngô Đức Thịnh, hai người có cột (column) email là NULL. Với NULL, điều kiện không đúng cũng không sai, mà là "không xác định", và `NOT` của "không xác định" vẫn là "không xác định". Bài 7 sẽ giải thích kỹ điều này. Còn bây giờ, hãy nhớ: khi cột có NULL, `NOT` và `<>` có thể loại nhiều hàng hơn bạn nghĩ.
+</Callout>
+
+## AND được tính trước OR
+
+Đây là phần quan trọng nhất của bài. Giả sử chủ cửa hàng muốn: "các loại **trà hoặc cà phê**, có giá **dưới 150000 đồng**". Viết thẳng theo câu nói:
+
+<Playground>
+```sql
+SELECT name,
+       category,
+       price
+FROM products
+WHERE category = 'Trà'
+   OR category = 'Cà phê'
+  AND price < 150000;
+```
+</Playground>
+
+Kết quả có **5 sản phẩm**, trong đó có trà sen Tây Hồ giá **390000** và trà shan tuyết giá **260000**, đắt hơn hẳn mức 150000. Câu lệnh không báo lỗi, nhưng làm sai ý.
+
+Lý do: giống như phép nhân được tính trước phép cộng ở bài 3, **`AND` được tính trước `OR`**. Database đọc điều kiện trên thành:
+
+```sql
+WHERE category = 'Trà'
+   OR (category = 'Cà phê' AND price < 150000)
+```
+
+Tức là: mọi loại trà (bất kể giá), cộng với những loại cà phê dưới 150000. Ba loại trà đều lọt vào, kể cả hai loại đắt. Để có đúng ý "(trà hoặc cà phê) và rẻ", bạn phải đặt ngoặc:
+
+<Playground>
+```sql
+SELECT name,
+       category,
+       price
+FROM products
+WHERE (category = 'Trà' OR category = 'Cà phê')
+  AND price < 150000;
+```
+</Playground>
+
+Giờ kết quả còn **3 sản phẩm**: Robusta (120000), trà ô long (140000) và cà phê Culi (145000). Hai câu lệnh chỉ khác nhau một cặp ngoặc, nhưng kết quả chênh 2 hàng.
+
+Thứ tự ưu tiên đầy đủ: các phép so sánh (`=`, `<`, `<>`…) được tính trước, rồi đến `NOT`, rồi `AND`, cuối cùng là `OR`. Vì vậy `NOT category = 'Dụng cụ'` nghĩa là `NOT (category = 'Dụng cụ')`: so sánh trước, rồi mới đảo ngược kết quả. Bạn không cần thuộc lòng: **cứ có cả AND lẫn OR trong một điều kiện thì đặt ngoặc**. Ngoặc thừa không làm hại gì, còn thiếu ngoặc làm sai kết quả một cách im lặng.
+
+## Bên trong database: kiểm tra từng hàng
+
+Với mỗi hàng, database tính giá trị của từng điều kiện nhỏ (đúng hoặc sai), rồi kết hợp chúng theo thứ tự `NOT`, `AND`, `OR` và theo ngoặc, để ra một kết luận cuối cùng: giữ hay bỏ hàng đó. Lấy hàng trà sen Tây Hồ (danh mục Trà, giá 390000) trong câu lệnh **không có ngoặc** ở trên:
+
+1. `category = 'Trà'`: đúng.
+2. `category = 'Cà phê'`: sai. `price < 150000`: sai. Ghép bằng `AND`: sai.
+3. Bước 1 `OR` bước 2: đúng `OR` sai cho ra **đúng**, nên hàng được giữ.
+
+Với câu lệnh **có ngoặc**: phần trong ngoặc (trà hoặc cà phê) cho ra đúng; `price < 150000` cho ra sai; đúng `AND` sai cho ra **sai**, nên hàng bị loại. Khi một câu lệnh cho kết quả lạ, bạn có thể tự làm đúng các bước này cho một hàng đáng ngờ để tìm ra chỗ sai.
+
+<details>
+<summary>Tự kiểm tra: tính từng bước cho cà phê Arabica</summary>
+
+Cà phê Arabica thuộc danh mục Cà phê, giá 165000. Thử tự tính trước khi đọc đáp án.
+
+- **Không ngoặc**: `category = 'Trà'` sai. `category = 'Cà phê' AND price < 150000` là đúng `AND` sai, ra sai. Sai `OR` sai ra **sai**: hàng bị loại.
+- **Có ngoặc**: `(category = 'Trà' OR category = 'Cà phê')` là sai `OR` đúng, ra đúng. Đúng `AND` (`price < 150000` sai) ra **sai**: hàng bị loại.
+
+Cả hai câu đều loại Arabica. Thiếu ngoặc không làm **mọi** hàng sai, chỉ làm sai những hàng như trà sen Tây Hồ. Đó chính là lý do lỗi này khó phát hiện.
+
+</details>
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Chữ &quot;và&quot; trong câu nói không phải lúc nào cũng là AND">
+"Liệt kê khách ở Hà Nội **và** Huế" nghe như cần `AND`, nhưng một khách không thể vừa ở Hà Nội vừa ở Huế. Viết `WHERE city = 'Hà Nội' AND city = 'Huế'` sẽ trả về **0 hàng**. Ý của câu nói là "khách ở Hà Nội, cùng với khách ở Huế", tức là `OR`. Trước khi viết, hãy tự hỏi: **một hàng** có cần thỏa cả hai điều kiện không?
+</Callout>
+
+<Callout type="warn" title="Viết tắt điều kiện sau OR">
+Trong câu nói, ta hay viết tắt "thành phố là Hà Nội hoặc Huế". Trong SQL, mỗi phía của `OR` phải là một điều kiện đầy đủ. Câu dưới đây không báo lỗi trên SQLite, nhưng kết quả sai:
+</Callout>
+
+<Playground>
+```sql
+SELECT name, city
+FROM customers
+WHERE city = 'Hà Nội'
+   OR 'Huế';
+```
+</Playground>
+
+Kết quả chỉ có **4 khách** ở Hà Nội, anh Tuấn ở Huế bị bỏ sót. Database hiểu `OR 'Huế'` là "hoặc chữ 'Huế' tự nó là đúng", và SQLite coi một chuỗi như `'Huế'` là sai. PostgreSQL chặt chẽ hơn: nó báo lỗi `invalid input syntax for type boolean: "Huế"`. Cách viết đúng là lặp lại cả điều kiện: `city = 'Hà Nội' OR city = 'Huế'`. Bài sau sẽ dạy `IN`, một cách viết gọn hơn cho đúng trường hợp này.
+
+<Callout type="warn" title="Quên ngoặc khi trộn AND và OR">
+Như ví dụ trà và cà phê ở trên: câu lệnh chạy được, kết quả trông hợp lý, chỉ sai ở vài hàng. Kiểu lỗi này khó phát hiện nhất. Quy tắc an toàn: có cả `AND` và `OR` thì luôn đặt ngoặc, kể cả khi bạn tin là thứ tự mặc định đã đúng.
+</Callout>
+
+## Tóm tắt
+
+- `AND`: hàng được giữ khi **mọi** điều kiện đều đúng. Thêm `AND` làm kết quả ít đi hoặc giữ nguyên. Khoảng thời gian nên viết `>= A AND < B`.
+- `OR`: hàng được giữ khi **ít nhất một** điều kiện đúng. Thêm `OR` làm kết quả nhiều lên hoặc giữ nguyên.
+- `NOT` đảo ngược một điều kiện. Khi phủ định cả nhóm, `AND` và `OR` đổi chỗ cho nhau (định luật De Morgan).
+- Thứ tự tính: `NOT`, rồi `AND`, rồi `OR`. Có cả `AND` và `OR` thì luôn đặt ngoặc.
+- Mỗi phía của `AND`/`OR` phải là một điều kiện đầy đủ; `city = 'Hà Nội' OR 'Huế'` là sai.
+- Khi cột có NULL, `NOT` có thể loại nhiều hàng hơn dự đoán (bài 7 sẽ giải thích).
+
+## Bài tập
+
+<Exercise hint="Hai điều kiện, cả hai đều phải đúng.">
+Cửa hàng muốn biết loại bánh nào **còn hàng** (số lượng tồn kho lớn hơn 0). Lấy 2 cột theo thứ tự: tên sản phẩm, số lượng tồn kho.
+
+```sql
+SELECT name, stock
+FROM products
+WHERE category = 'Bánh'
+  AND stock > 0;
+```
+</Exercise>
+
+<Exercise hint="Một đơn chỉ có một trạng thái. Câu nói dùng chữ 'và', nhưng một đơn có cần thỏa cả hai không?">
+Nhân viên cần rà lại các đơn **đã hủy và** các đơn **chờ xác nhận**. Kết quả gồm 2 cột theo thứ tự: `id`, `status`.
+
+```sql
+SELECT id, status
+FROM orders
+WHERE status = 'đã hủy'
+   OR status = 'chờ xác nhận';
+```
+</Exercise>
+
+<Exercise hint="Đọc lại phần 'AND được tính trước OR'. Câu này thiếu một cặp ngoặc." starter={"SELECT id,\n       status,\n       ordered_on\nFROM orders\nWHERE status = 'đã hủy'\n   OR status = 'chờ xác nhận'\n  AND ordered_on >= '2025-09-01';\n"}>
+Câu lệnh có sẵn trong ô muốn tìm các đơn **đã hủy hoặc chờ xác nhận** được đặt từ ngày 2025-09-01 trở đi, để nhân viên gọi lại cho khách. Nhưng kết quả của nó lại có cả một đơn đặt từ tháng 4. Hãy sửa để kết quả đúng ý, giữ nguyên 3 cột `id`, `status`, `ordered_on`.
+
+```sql
+SELECT id,
+       status,
+       ordered_on
+FROM orders
+WHERE (status = 'đã hủy' OR status = 'chờ xác nhận')
+  AND ordered_on >= '2025-09-01';
+```
+</Exercise>
+
+<Exercise hint="'Không phải dụng cụ' có thể viết bằng NOT hoặc <>. Kết hợp với điều kiện giá bằng AND.">
+Tìm các sản phẩm **không phải dụng cụ** và có giá dưới 150000 đồng. Kết quả gồm 3 cột theo thứ tự: `name`, `category`, `price`.
+
+```sql
+SELECT name,
+       category,
+       price
+FROM products
+WHERE NOT category = 'Dụng cụ'
+  AND price < 150000;
+```
+</Exercise>
+
+<Exercise hint="Thành tiền là quantity * unit_price (bài 3). Viết lại biểu thức trong WHERE, không dùng bí danh (bài 4).">
+Cửa hàng muốn xem những hàng trong chi tiết đơn hàng vừa có **thành tiền từ 300000 đồng trở lên**, vừa có **số lượng từ 2 trở lên** (khách mua nhiều cái). Kết quả gồm 4 cột theo thứ tự: `order_id`, `product_id`, `quantity`, và thành tiền.
+
+```sql
+SELECT order_id,
+       product_id,
+       quantity,
+       quantity * unit_price AS thanh_tien
+FROM order_items
+WHERE quantity * unit_price >= 300000
+  AND quantity >= 2;
+```
+</Exercise>
+
+Bạn đã thấy viết `city = 'Hà Nội' OR city = 'Huế' OR city = …` khá dài khi có nhiều giá trị. Bài tiếp theo giới thiệu ba cách viết gọn và mạnh hơn: `IN` cho danh sách giá trị, `BETWEEN` cho khoảng, và `LIKE` để tìm theo mẫu chữ.

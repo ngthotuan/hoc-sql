@@ -1,0 +1,348 @@
+---
+title: Rẽ nhánh với CASE
+description: Gắn nhãn và phân loại từng hàng bằng CASE WHEN … THEN … ELSE … END, hiểu vì sao thứ tự các nhánh quyết định kết quả, và dùng CASE để sắp xếp theo thứ tự tùy ý.
+order: 11
+---
+
+Chủ cửa hàng muốn xem danh sách sản phẩm kèm một nhãn đơn giản: dưới 100 nghìn là **rẻ**, dưới 200 nghìn là **vừa**, còn lại là **đắt**. Các hàm ở bài 10 biến đổi một giá trị theo cùng một công thức cho mọi hàng (row). Còn ở đây, mỗi hàng cần một kết quả khác nhau **tùy theo điều kiện** (condition): nếu giá thế này thì ghi nhãn này, nếu không thì xét tiếp.
+
+Trong SQL, "nếu… thì…" được viết bằng biểu thức (expression) `CASE`. Bài này dạy cách viết nó, một quy tắc quan trọng về thứ tự các nhánh, cách xử lý NULL bên trong `CASE`, và cách dùng `CASE` để sắp xếp theo thứ tự mà bạn tự quy định.
+
+## CASE: nếu… thì… cho từng hàng
+
+Một biểu thức `CASE` có dạng:
+
+```sql
+CASE
+  WHEN điều_kiện_1 THEN kết_quả_1
+  WHEN điều_kiện_2 THEN kết_quả_2
+  ELSE kết_quả_khác
+END
+```
+
+Mỗi `WHEN … THEN …` là một **nhánh**: `WHEN` đi kèm một điều kiện viết giống hệt điều kiện trong `WHERE`, `THEN` là giá trị trả về nếu điều kiện đúng. `ELSE` là giá trị khi không nhánh nào đúng. `END` đóng biểu thức. Toàn bộ khối từ `CASE` tới `END` là **một giá trị**, nên nó đứng trong `SELECT` như một cột bình thường và đặt bí danh (alias) bằng `AS`:
+
+<Playground>
+```sql
+SELECT name,
+       price,
+       CASE
+         WHEN price < 100000 THEN 'rẻ'
+         WHEN price < 200000 THEN 'vừa'
+         ELSE 'đắt'
+       END AS muc_gia
+FROM products
+ORDER BY price;
+```
+</Playground>
+
+Kết quả (result set) có đủ 12 sản phẩm, chia đều thành ba nhóm. Bốn sản phẩm từ phin nhôm (45000) tới ly sứ (89000) là `rẻ`. Bốn sản phẩm từ Robusta (120000) tới Arabica (165000) là `vừa`. Bốn sản phẩm còn lại, từ bình giữ nhiệt (215000) tới máy xay (450000), là `đắt`. Giống hàm ở bài 10, `CASE` được tính **cho từng hàng**: database lấy `price` của hàng đó, xét lần lượt các nhánh, rồi ghi nhãn vào cột (column) `muc_gia`. Bảng (table) `products` không thay đổi gì; nhãn chỉ tồn tại trong kết quả, như mọi cột tính toán ở bài 3.
+
+Hãy để ý cách trình bày: mỗi `WHEN` một dòng, thụt vào so với `CASE`, và `END AS muc_gia` thẳng hàng với `CASE`. Câu lệnh nào có `CASE` dài cũng nên viết như vậy để nhìn ra từng nhánh.
+
+<Callout type="try">
+Đổi mốc `200000` thành `150000` rồi chạy lại. Culi (145000) vẫn là `vừa`, còn Arabica (165000) chuyển sang `đắt`.
+</Callout>
+
+## CASE dừng ở nhánh đúng đầu tiên
+
+Nhìn lại nhánh thứ hai: `WHEN price < 200000 THEN 'vừa'`. Phin nhôm giá 45000 cũng nhỏ hơn 200000, vậy sao nó không bị ghi là `vừa`? Vì `CASE` xét các nhánh **từ trên xuống** và **dừng ở nhánh đúng đầu tiên**. Phin nhôm khớp ngay nhánh `price < 100000`, nên được ghi `rẻ` và nhánh thứ hai không bao giờ được xét tới. Chỉ những hàng **trượt** nhánh đầu mới đi tiếp xuống nhánh hai.
+
+Nhờ vậy, nhánh `vừa` không cần viết đủ `price >= 100000 AND price < 200000`: khi tới được nhánh hai, giá chắc chắn đã từ 100000 trở lên. Nhưng điều đó cũng có nghĩa là **đổi thứ tự các nhánh sẽ đổi kết quả**. Đây là câu lệnh trên với hai nhánh đầu bị đảo:
+
+<Playground>
+```sql
+SELECT name,
+       price,
+       CASE
+         WHEN price < 200000 THEN 'vừa'
+         WHEN price < 100000 THEN 'rẻ'
+         ELSE 'đắt'
+       END AS muc_gia
+FROM products
+ORDER BY price;
+```
+</Playground>
+
+Không còn sản phẩm nào là `rẻ`. Tám sản phẩm dưới 200000 đều thành `vừa`, kể cả phin nhôm 45000 đồng. Lý do: mọi giá dưới 100000 cũng dưới 200000, nên chúng khớp nhánh đầu tiên và dừng ở đó. Nhánh `rẻ` vẫn nằm trong câu lệnh nhưng không bao giờ được chạm tới. Database không báo lỗi hay cảnh báo gì, vì về cú pháp câu lệnh (statement) hoàn toàn hợp lệ.
+
+Quy tắc rút ra: khi các nhánh là những khoảng lồng nhau (dưới 100 nghìn nằm trong dưới 200 nghìn), hãy viết **nhánh hẹp nhất trước**. Với mốc "nhỏ hơn" thì xếp mốc tăng dần (`< 100000` rồi `< 200000`); với mốc "từ … trở lên" thì xếp mốc giảm dần (`>= 300000` rồi `>= 100000`).
+
+## ELSE, và khi không nhánh nào đúng
+
+`ELSE` không bắt buộc. Nhưng nếu bỏ nó và một hàng không khớp nhánh nào, `CASE` trả về **NULL**. Ô dưới đây gắn cảnh báo tồn kho, chỉ quan tâm hàng hết và hàng sắp hết:
+
+<Playground>
+```sql
+SELECT name,
+       stock,
+       CASE
+         WHEN stock = 0 THEN 'hết hàng'
+         WHEN stock < 30 THEN 'sắp hết'
+       END AS canh_bao
+FROM products
+ORDER BY stock, name;
+```
+</Playground>
+
+Bánh pía và bình giữ nhiệt (`stock` bằng 0) là `hết hàng`. Trà sen (8), máy xay (12) và trà shan tuyết (20) là `sắp hết`. Bảy sản phẩm từ Arabica (35) trở đi không khớp nhánh nào, và vì không có `ELSE`, cột `canh_bao` của chúng là NULL. Ở đây NULL có nghĩa là "không có gì để cảnh báo", nên kết quả vẫn dùng được. Nhưng nếu bạn định lọc hay ghép chuỗi trên cột này, các ô NULL sẽ gây đúng những bẫy ở bài 7. Khi có thể, hãy viết `ELSE` để mọi hàng đều có giá trị rõ ràng, ví dụ `ELSE 'đủ hàng'`.
+
+### Điều kiện về NULL trong WHEN
+
+Điều kiện sau `WHEN` tuân theo đúng logic ba giá trị của bài 7: nhánh chỉ được chọn khi điều kiện **đúng**; "sai" và "không xác định" đều khiến `CASE` đi tiếp xuống nhánh sau. Vì vậy, kiểm tra NULL trong `CASE` cũng phải dùng `IS NULL` / `IS NOT NULL`. Ô dưới đây chọn cách liên lạc ưu tiên cho khách ở Hà Nội và TP.HCM: có số điện thoại thì gọi, không có thì gửi email:
+
+<Playground>
+```sql
+SELECT name,
+       CASE
+         WHEN phone IS NOT NULL THEN 'Gọi ' || phone
+         WHEN email IS NOT NULL THEN 'Email ' || email
+         ELSE 'Không có liên hệ'
+       END AS lien_he
+FROM customers
+WHERE city IN ('Hà Nội', 'TP.HCM');
+```
+</Playground>
+
+Bảy khách thuộc hai thành phố. Năm khách có số điện thoại nên nhận `Gọi …`, ví dụ chị Hà: `Gọi 0912345678`. Trần Minh Khoa không có số nhưng có email, nên trượt nhánh đầu và khớp nhánh hai: `Email khoa.tran@example.com`. Ngô Đức Thịnh không có cả hai, trượt cả hai nhánh và nhận giá trị của `ELSE`. Câu này làm được điều mà `COALESCE(phone, email, 'Không có liên hệ')` của bài 7 không làm được: mỗi lựa chọn có một tiền tố riêng ("Gọi", "Email"), vì mỗi nhánh của `CASE` là một biểu thức tùy ý.
+
+## Dạng rút gọn: so một cột với nhiều giá trị
+
+Khi mọi nhánh đều so **cùng một cột** bằng dấu `=`, SQL có dạng viết gọn hơn: đặt cột ngay sau `CASE`, và mỗi `WHEN` chỉ ghi giá trị cần so.
+
+<Playground>
+```sql
+SELECT id,
+       status,
+       CASE status
+         WHEN 'đã giao' THEN 'Hoàn tất'
+         WHEN 'đã hủy' THEN 'Hoàn tất'
+         ELSE 'Đang xử lý'
+       END AS nhom
+FROM orders
+WHERE customer_id IN (1, 4);
+```
+</Playground>
+
+Khách 1 (chị Hà) và khách 4 (Phạm Quốc Huy) có tổng cộng 6 đơn. Bốn đơn `đã giao` (1, 3, 5, 11) và đơn 12 `đã hủy` đều thuộc nhóm `Hoàn tất`, vì đơn đã kết thúc theo cách nào đó. Đơn 18 `chờ xác nhận` không khớp hai giá trị trên nên rơi vào `ELSE`: `Đang xử lý`. `CASE status WHEN 'đã giao'` có nghĩa đúng như `CASE WHEN status = 'đã giao'`.
+
+Dạng rút gọn chỉ so bằng `=`, nên nó không làm được khoảng giá (`<`), mẫu chữ (`LIKE`) hay `IS NULL`. Khi đó dùng dạng đầy đủ như các phần trước. Dạng đầy đủ cũng gộp được hai nhánh ở trên làm một: `WHEN status IN ('đã giao', 'đã hủy') THEN 'Hoàn tất'`.
+
+<Callout type="warn" title="CASE cột WHEN NULL không bao giờ khớp">
+Vì dạng rút gọn so bằng `=`, viết `CASE phone WHEN NULL THEN …` cũng giống `phone = NULL` ở bài 7: kết quả là "không xác định", nhánh không bao giờ được chọn. Không có lỗi nào báo cho bạn biết.
+</Callout>
+
+<Playground>
+```sql
+-- Sai: WHEN NULL không bao giờ khớp
+SELECT name,
+       CASE phone
+         WHEN NULL THEN 'chưa có số'
+         ELSE phone
+       END AS lien_he
+FROM customers
+WHERE city = 'Hà Nội';
+```
+</Playground>
+
+Ngô Đức Thịnh không có số điện thoại, nhưng cột `lien_he` của anh là NULL chứ không phải `chưa có số`. Hàng của anh trượt nhánh `WHEN NULL`, rơi xuống `ELSE phone`, và `phone` của anh là NULL. Ba khách Hà Nội còn lại hiện số điện thoại như bình thường. Cách sửa: dùng dạng đầy đủ `CASE WHEN phone IS NULL THEN 'chưa có số' ELSE phone END`.
+
+## CASE trong ORDER BY: sắp theo thứ tự tùy ý
+
+`CASE` là một biểu thức, nên nó dùng được ở mọi nơi một giá trị được phép xuất hiện, kể cả `ORDER BY` (bài 8 đã sắp theo biểu thức). Mẹo thường dùng: đổi mỗi giá trị thành một **con số thứ tự** rồi sắp theo số đó. Ví dụ cửa hàng đặt kho chính ở Hà Nội và muốn khách Hà Nội đứng đầu danh sách, các thành phố khác theo sau:
+
+<Playground>
+```sql
+SELECT name, city
+FROM customers
+ORDER BY CASE
+           WHEN city = 'Hà Nội' THEN 0
+           ELSE 1
+         END,
+         city,
+         name;
+```
+</Playground>
+
+Bốn khách Hà Nội đứng đầu, vì `CASE` cho họ số 0 còn mọi khách khác số 1. Trong nhóm số 1, tiêu chí thứ hai `city` sắp các thành phố còn lại: Cần Thơ, Huế, Hải Phòng, TP.HCM, rồi Đà Nẵng cuối cùng. Thứ tự này theo mã ký tự như bài 8 đã giải thích, nên "Huế" đứng trước "Hải Phòng" và "Đà Nẵng" đứng sau "TP.HCM". Tiêu chí thứ ba `name` sắp khách cùng thành phố. Con số thứ tự 0, 1 không hiện trong kết quả, vì nó chỉ nằm trong `ORDER BY`.
+
+Cũng mẹo này giải quyết được chuyện NULL đứng đầu hay cuối, vốn khác nhau giữa SQLite và PostgreSQL (bài 8). Thay vì `NULLS FIRST` (MySQL không có), bạn tự đặt số thứ tự cho NULL:
+
+<Playground>
+```sql
+SELECT id,
+       status,
+       shipped_on
+FROM orders
+WHERE customer_id IN (1, 4)
+ORDER BY CASE
+           WHEN shipped_on IS NULL THEN 0
+           ELSE 1
+         END,
+         shipped_on,
+         id;
+```
+</Playground>
+
+Hai đơn chưa gửi (12 `đã hủy` và 18 `chờ xác nhận`) đứng đầu, sắp với nhau theo `id`. Sau đó là bốn đơn đã gửi theo ngày gửi tăng dần, từ 2025-03-04 tới 2025-09-11. Kết quả này giống hệt nhau trên SQLite, PostgreSQL và MySQL, vì thứ tự không còn phụ thuộc vào việc mỗi database xếp NULL ở đâu.
+
+<Callout type="note" title="Bí danh bên trong CASE ở ORDER BY">
+Bài 8 đã nói PostgreSQL chỉ nhận bí danh khi nó **đứng một mình** trong `ORDER BY`. Vì vậy, nếu `SELECT` có cột `CASE … END AS muc_gia`, bạn được viết `ORDER BY muc_gia`, nhưng `ORDER BY CASE muc_gia WHEN … END` thì lỗi trên PostgreSQL (SQLite vẫn chạy). Hãy viết lại biểu thức theo cột gốc.
+</Callout>
+
+## Bên trong database: một CASE, một kiểu kết quả
+
+Với mỗi hàng, database tính các điều kiện `WHEN` theo thứ tự và dừng ở điều kiện đúng đầu tiên. Các nhánh sau đó không được tính cho hàng ấy. Đây chính là lý do thứ tự nhánh quyết định kết quả ở phần trên.
+
+Còn một điều nữa: cột do `CASE` tạo ra phải có **một kiểu dữ liệu** (data type) duy nhất, vì mọi hàng của một cột cùng một kiểu. PostgreSQL xác định kiểu này từ các giá trị sau `THEN` và `ELSE`. Nếu một nhánh là chuỗi viết trong nháy đơn còn nhánh khác là cột số, PostgreSQL chọn kiểu số cho cả cột rồi thử đổi chuỗi sang số; chuỗi như `'hết hàng'` không đổi được nên báo lỗi. (Trộn hẳn một cột chữ với một cột số, ví dụ `THEN name ELSE stock`, thì PostgreSQL báo lỗi ngay mà không thử đổi.) SQLite thì dễ dãi như bài 1 đã nói: mỗi ô giữ kiểu riêng của nó. Ô dưới đây muốn hiện "hết hàng" thay cho số 0:
+
+<Playground>
+```sql
+SELECT name,
+       CASE
+         WHEN stock = 0 THEN 'hết hàng'
+         ELSE stock
+       END AS ton_kho
+FROM products
+WHERE category = 'Dụng cụ';
+```
+</Playground>
+
+Trên SQLite, câu này chạy: bốn dụng cụ, bình giữ nhiệt hiện `hết hàng`, ba món còn lại hiện số tồn (120, 60, 12). Nhưng cột `ton_kho` lúc này trộn lẫn chữ và số. Trên PostgreSQL, cùng câu lệnh báo lỗi:
+
+```
+ERROR: invalid input syntax for type integer: "hết hàng"
+```
+
+Nghĩa là PostgreSQL đã chọn kiểu số nguyên cho cột (theo `ELSE stock`) và không đổi được chữ "hết hàng" sang số. Cách sửa dùng `CAST` của bài 10 để mọi nhánh cùng là chữ: `ELSE CAST(stock AS TEXT)`. Câu đã sửa cho cùng kết quả trên cả hai database. MySQL thì tự đổi cả cột về chữ, nên không báo lỗi.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Quên END">
+Mỗi `CASE` phải đóng bằng `END`. Thiếu nó, database đọc tiếp tới `AS` và báo lỗi cú pháp ở đó: SQLite ghi `near "AS": syntax error`, PostgreSQL ghi `syntax error at or near "AS"`. Như bài 2 đã dặn, chỗ sai thật nằm **trước** vị trí được báo.
+</Callout>
+
+```sql
+-- Thiếu END: báo lỗi near "AS": syntax error
+SELECT name,
+       CASE
+         WHEN stock = 0 THEN 'hết hàng'
+         ELSE 'còn hàng'
+       AS tinh_trang
+FROM products;
+```
+
+Lỗi `near "AS": syntax error` chỉ vào `AS`, nhưng thứ thiếu là `END` ở dòng ngay trên. Thêm `END` trước `AS tinh_trang` thì câu chạy được, cho 2 sản phẩm `hết hàng` và 10 sản phẩm `còn hàng`.
+
+<Callout type="warn" title="Nhánh rộng đặt trước nhánh hẹp">
+Như phần "CASE dừng ở nhánh đúng đầu tiên" đã cho thấy, `WHEN price < 200000` đặt trước `WHEN price < 100000` khiến nhãn `rẻ` không bao giờ xuất hiện, và database không cảnh báo gì. Sau khi viết `CASE`, hãy kiểm tra mỗi nhãn có xuất hiện trong kết quả hay không. Một nhãn không bao giờ xuất hiện thường là dấu hiệu thứ tự nhánh sai.
+</Callout>
+
+<Callout type="warn" title="Trộn chữ và số giữa các nhánh">
+Chạy được trên SQLite không có nghĩa là chạy được trên PostgreSQL. Khi một nhánh trả về chữ, hãy cho mọi nhánh cùng trả về chữ, dùng `CAST(… AS TEXT)` nếu cần.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| `CASE WHEN … THEN … ELSE … END` | có | có | có |
+| Dạng rút gọn `CASE cột WHEN giá_trị` | có | có | có |
+| Các nhánh trả về chữ và số lẫn lộn | chạy, mỗi ô giữ kiểu riêng | lỗi, cần `CAST` | chạy, cả cột thành chữ |
+| Bí danh bên trong `CASE` ở `ORDER BY` | chạy | lỗi | chạy |
+
+`CASE` là cú pháp chuẩn của SQL, nên viết đúng chuẩn thì chạy trên mọi database. MySQL còn có hàm `IF(điều_kiện, a, b)` viết ngắn hơn cho trường hợp chỉ có hai nhánh, nhưng nó không có trên PostgreSQL; lộ trình MySQL sẽ nhắc lại.
+
+## Tóm tắt
+
+- `CASE WHEN điều_kiện THEN giá_trị … ELSE giá_trị END` là một biểu thức, tính cho từng hàng, dùng được trong `SELECT` (kèm `AS`) và trong `ORDER BY`.
+- `CASE` xét các nhánh từ trên xuống và dừng ở nhánh đúng đầu tiên. Với khoảng lồng nhau, viết nhánh hẹp trước; sai thứ tự thì có nhãn không bao giờ xuất hiện.
+- Thiếu `ELSE` thì hàng không khớp nhánh nào nhận NULL.
+- Điều kiện trong `WHEN` theo logic ba giá trị: kiểm tra NULL bằng `IS NULL`. Dạng rút gọn `CASE cột WHEN …` so bằng `=`, nên `WHEN NULL` không bao giờ khớp.
+- `ORDER BY CASE … END` sắp theo thứ tự tùy ý, và đặt NULL đầu hay cuối giống nhau trên mọi database.
+- Mọi nhánh nên trả về cùng một kiểu: trộn chữ và số chạy trên SQLite nhưng lỗi trên PostgreSQL; sửa bằng `CAST`.
+
+## Bài tập
+
+<Exercise hint="Đơn chưa gửi là đơn có shipped_on là NULL. Lọc ngày bằng >= như bài 4.">
+Với các đơn đặt **từ ngày 2025-11-01 trở đi**, lấy 2 cột theo thứ tự: mã đơn, và cột tình trạng gửi có giá trị `'đã gửi'` nếu đơn đã có ngày gửi, `'chưa gửi'` nếu chưa.
+
+```sql
+SELECT id,
+       CASE
+         WHEN shipped_on IS NULL THEN 'chưa gửi'
+         ELSE 'đã gửi'
+       END AS tinh_trang
+FROM orders
+WHERE ordered_on >= '2025-11-01';
+```
+</Exercise>
+
+<Exercise hint="Giá mới phụ thuộc vào danh mục: mỗi danh mục một nhánh, các danh mục khác giữ nguyên giá. Giảm 10% nghĩa là còn 9/10 giá.">
+Cửa hàng giảm giá theo danh mục: **Trà giảm 10%**, **Bánh giảm 20%**, các danh mục khác giữ nguyên giá. Với mọi sản phẩm, lấy 2 cột theo thứ tự: tên sản phẩm, giá sau khi giảm.
+
+```sql
+SELECT name,
+       CASE category
+         WHEN 'Trà' THEN price * 9 / 10
+         WHEN 'Bánh' THEN price * 8 / 10
+         ELSE price
+       END AS gia_moi
+FROM products;
+```
+</Exercise>
+
+<Exercise hint="Chạy thử câu có sẵn: nhãn nào không bao giờ xuất hiện? Nhớ CASE dừng ở nhánh đúng đầu tiên." starter={"SELECT name,\n       CASE\n         WHEN price >= 100000 THEN 'trung bình'\n         WHEN price >= 300000 THEN 'cao cấp'\n         ELSE 'phổ thông'\n       END AS phan_khuc\nFROM products;\n"}>
+Cửa hàng chia sản phẩm thành ba phân khúc: **cao cấp** từ 300000 đồng trở lên, **trung bình** từ 100000 tới dưới 300000, **phổ thông** dưới 100000. Câu lệnh có sẵn trong ô xếp sai một số sản phẩm. Hãy sửa cho đúng, giữ nguyên 2 cột.
+
+```sql
+SELECT name,
+       CASE
+         WHEN price >= 300000 THEN 'cao cấp'
+         WHEN price >= 100000 THEN 'trung bình'
+         ELSE 'phổ thông'
+       END AS phan_khuc
+FROM products;
+```
+</Exercise>
+
+<Exercise hint="Lọc ba trạng thái bằng IN. Thứ tự mong muốn không phải thứ tự chữ cái tăng hay giảm dần, nên cần CASE trong ORDER BY, rồi thêm tiêu chí phụ.">
+Bộ phận chăm sóc khách hàng cần danh sách các đơn **đang giao**, **chờ xác nhận** hoặc **đã hủy**, sắp theo trạng thái theo đúng thứ tự: `đang giao` trước, rồi `chờ xác nhận`, cuối cùng `đã hủy`. Trong cùng trạng thái, sắp theo **ngày đặt từ cũ tới mới**. Kết quả gồm 3 cột theo thứ tự: `id`, `status`, `ordered_on`.
+
+```sql
+SELECT id,
+       status,
+       ordered_on
+FROM orders
+WHERE status IN ('đang giao', 'chờ xác nhận', 'đã hủy')
+ORDER BY CASE status
+           WHEN 'đang giao' THEN 1
+           WHEN 'chờ xác nhận' THEN 2
+           ELSE 3
+         END,
+         ordered_on;
+```
+</Exercise>
+
+<Exercise hint="Một CASE trong SELECT để ghi tên miền, một CASE trong ORDER BY để sắp theo thứ tự Bắc, Trung, Nam. WHEN có thể dùng IN.">
+Chia khách theo miền: Hà Nội và Hải Phòng là `'Bắc'`; Huế và Đà Nẵng là `'Trung'`; TP.HCM và Cần Thơ là `'Nam'`. Lấy 3 cột theo thứ tự: tên khách, thành phố, miền. Sắp theo miền theo thứ tự **Bắc, Trung, Nam**; trong cùng miền, sắp theo **mã khách (`id`) tăng dần**.
+
+```sql
+SELECT name,
+       city,
+       CASE
+         WHEN city IN ('Hà Nội', 'Hải Phòng') THEN 'Bắc'
+         WHEN city IN ('Huế', 'Đà Nẵng') THEN 'Trung'
+         ELSE 'Nam'
+       END AS mien
+FROM customers
+ORDER BY CASE
+           WHEN city IN ('Hà Nội', 'Hải Phòng') THEN 1
+           WHEN city IN ('Huế', 'Đà Nẵng') THEN 2
+           ELSE 3
+         END,
+         id;
+```
+</Exercise>
+
+Đến giờ, mỗi câu truy vấn (query) trả về một hàng kết quả cho mỗi hàng dữ liệu. Nhưng nhiều câu hỏi cần **gộp** nhiều hàng thành một con số: cửa hàng có bao nhiêu đơn, tổng số hàng tồn kho là bao nhiêu, sản phẩm đắt nhất giá bao nhiêu. Bài tiếp theo giới thiệu các hàm tổng hợp (aggregate function) làm việc đó.

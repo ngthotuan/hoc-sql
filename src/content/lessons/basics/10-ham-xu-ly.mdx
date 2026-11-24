@@ -1,0 +1,282 @@
+---
+title: Hàm xử lý chuỗi, số và ngày
+description: Biến đổi giá trị ngay trong câu truy vấn bằng các hàm xử lý chữ, số, ngày tháng và đổi kiểu dữ liệu; nhận ra những hàm hoạt động khác nhau giữa SQLite và PostgreSQL, nhất là với tiếng Việt.
+order: 10
+---
+
+Đến giờ, mọi giá trị trong kết quả đều hiện y như được lưu, hoặc là kết quả của phép tính `+ - * /` ở bài 3. Nhưng nhiều câu hỏi cần biến đổi dữ liệu theo cách khác: lấy **đầu số** của số điện thoại để biết khách dùng mạng nào, **làm tròn** giá sau thuế, lấy **tháng** từ ngày đặt hàng để xem tháng nào bán chạy.
+
+Bài 7 đã giới thiệu hàm (function) đầu tiên, `COALESCE`: một cái tên, theo sau là cặp ngoặc chứa các giá trị đầu vào, và trả về một giá trị. SQL có rất nhiều hàm như vậy. Bài này giới thiệu những hàm dùng nhiều nhất cho chữ, số, ngày tháng và đổi kiểu dữ liệu (data type). Bài cũng chỉ ra những hàm mà SQLite và PostgreSQL xử lý khác nhau, vì tên và hành vi của hàm là một trong những chỗ các database khác nhau nhiều.
+
+## Hàm xử lý chuỗi
+
+### Lấy một phần chuỗi: SUBSTR
+
+`SUBSTR(chuỗi, vị trí, số ký tự)` cắt lấy một đoạn của chuỗi (string), bắt đầu từ `vị trí` và dài `số ký tự`. Ký tự đầu tiên có vị trí là **1**, không phải 0. Ví dụ, đầu số là 3 ký tự đầu của số điện thoại. Hàm dùng trong `SELECT` giống mọi biểu thức (expression) ở bài 3, và có thể đặt bí danh (alias) bằng `AS`:
+
+<Playground>
+```sql
+SELECT name,
+       phone,
+       SUBSTR(phone, 1, 3) AS dau_so
+FROM customers
+WHERE phone IS NOT NULL;
+```
+</Playground>
+
+Kết quả (result set) có 7 khách có số điện thoại, mỗi khách kèm đầu số: chị Hà và chị Yến dùng đầu số `091`, Phạm Quốc Huy và Lý Kim Chi dùng `090`. Hàm được tính **cho từng hàng** (row), giống biểu thức ở bài 3: database lấy `phone` của mỗi hàng, cắt 3 ký tự đầu, đưa vào cột (column) `dau_so`. `WHERE phone IS NOT NULL` loại 5 khách chưa có số; nếu không lọc, cột `dau_so` của họ sẽ là NULL, vì giống phép tính với NULL ở bài 3, hầu hết hàm nhận NULL cũng trả về NULL (`COALESCE` ở bài 7 là ngoại lệ có chủ đích).
+
+### Độ dài, thay thế, cắt khoảng trắng
+
+| Hàm | Làm gì | Ví dụ | Kết quả |
+|---|---|---|---|
+| `LENGTH(s)` | số ký tự | `LENGTH('Hà Nội')` | `6` |
+| `REPLACE(s, a, b)` | thay mọi chỗ `a` bằng `b` | `REPLACE('Cà phê Culi 500g', '500g', '0,5kg')` | `Cà phê Culi 0,5kg` |
+| `TRIM(s)` | bỏ khoảng trắng ở hai đầu | `TRIM('  Hà Nội  ')` | `Hà Nội` |
+
+`LENGTH` đếm **ký tự**, kể cả chữ có dấu: `'Hà Nội'` và `'Ha Noi'` đều dài 6. Bạn có thể dùng hàm ở bất cứ đâu một giá trị được phép xuất hiện. Ô dưới đây tính độ dài tên rồi sắp xếp theo bí danh của nó (bài 8):
+
+<Playground>
+```sql
+SELECT name,
+       LENGTH(name) AS do_dai
+FROM products
+ORDER BY do_dai DESC, name;
+```
+</Playground>
+
+Tên dài nhất là "Bánh đậu xanh Hải Dương" với 23 ký tự, tiếp theo là "Bình giữ nhiệt 500ml" với 20. Tên ngắn nhất là "Ly sứ men lam" với 13 ký tự. Cột phụ `name` phá thế hòa giữa các tên dài bằng nhau, như bài 8 đã dặn.
+
+Thử `REPLACE` và `TRIM`. Ô dưới đây có hai câu lệnh (statement), nên trả về hai bảng (table) kết quả:
+
+<Playground>
+```sql
+-- REPLACE: đổi "500g" thành "0,5kg"
+SELECT name,
+       REPLACE(name, '500g', '0,5kg') AS ten_moi
+FROM products
+WHERE name LIKE '%500g';
+
+-- TRIM: so sánh trước và sau khi cắt khoảng trắng
+SELECT '[' || '  Hà Nội  ' || ']' AS truoc_khi_cat,
+       '[' || TRIM('  Hà Nội  ') || ']' AS sau_khi_cat;
+```
+</Playground>
+
+Hai sản phẩm có tên kết thúc bằng "500g" là Robusta và Culi. Ở bảng đầu, cột `ten_moi` đổi "500g" thành "0,5kg": `Cà phê Robusta 0,5kg`. Bảng sau (câu `SELECT` không có `FROM`, như bài 7) có 1 hàng: cột `truoc_khi_cat` là `[  Hà Nội  ]`, còn 2 dấu cách mỗi bên; cột `sau_khi_cat` là `[Hà Nội]`. Hai dấu ngoặc vuông chỉ để bạn nhìn thấy khoảng trắng.
+
+`TRIM` thường dùng để dọn dữ liệu người dùng gõ vào: bài 4 đã cho thấy `'Hà Nội '` (thừa dấu cách cuối) không bằng `'Hà Nội'`. Một cột bị lẫn khoảng trắng thừa có thể so sánh đúng sau khi `TRIM`.
+
+### Viết hoa, viết thường: UPPER và LOWER
+
+`UPPER(s)` đổi chuỗi thành chữ hoa, `LOWER(s)` thành chữ thường. Với chữ không dấu, chúng hoạt động như bạn nghĩ. Với tiếng Việt thì không hẳn:
+
+<Playground>
+```sql
+SELECT DISTINCT city,
+       UPPER(city) AS viet_hoa,
+       LOWER(city) AS viet_thuong
+FROM customers
+WHERE city IN ('Hà Nội', 'Đà Nẵng', 'Huế');
+```
+</Playground>
+
+`DISTINCT` (bài 9) gộp các khách cùng thành phố, nên kết quả có 3 hàng, mỗi thành phố một hàng. Trên SQLite, `UPPER('Hà Nội')` ra `Hà NộI` chứ không phải `HÀ NỘI`, và `UPPER('Đà Nẵng')` ra `Đà NẵNG`. `LOWER` cũng vậy: chữ `Đ` vẫn giữ nguyên chữ hoa. Lý do giống `LIKE` ở bài 6: `UPPER` và `LOWER` của SQLite **chỉ đổi chữ cái không dấu** (a–z). SQLite mặc định chỉ mang theo bảng chữ hoa/thường cho chữ không dấu để giữ thư viện nhỏ gọn; muốn xử lý đủ chữ có dấu phải cài thêm phần mở rộng (ICU). PostgreSQL thì đổi đúng cả chữ có dấu: `UPPER('Hà Nội')` ra `HÀ NỘI`.
+
+Vì vậy, đừng dùng `UPPER`/`LOWER` của SQLite để so sánh chữ tiếng Việt không phân biệt hoa thường: `WHERE UPPER(city) = 'HÀ NỘI'` sẽ không khớp hàng nào, vì SQLite ra `Hà NộI`. Bài 9 đã hẹn "viết hoa tên": với tên khách tiếng Việt như `UPPER('Nguyễn Thu Hà')`, SQLite cũng chỉ viết hoa được các chữ không dấu, nên kết quả là `NGUYễN THU Hà`. PostgreSQL (với thiết lập ngôn ngữ thông thường, kiểu UTF-8) cho ra đúng `NGUYỄN THU HÀ`.
+
+## Hàm xử lý số
+
+`ROUND(x, n)` làm tròn `x` tới `n` chữ số thập phân; bỏ `n` thì làm tròn tới số nguyên. `ABS(x)` lấy giá trị tuyệt đối (bỏ dấu âm). Ô dưới đây có hai câu lệnh. Câu đầu tính giá đã gồm thuế giá trị gia tăng 8%, làm tròn tới đồng:
+
+<Playground>
+```sql
+SELECT name,
+       price,
+       price * 1.08 AS chua_lam_tron,
+       ROUND(price * 1.08) AS gia_gom_vat
+FROM products;
+
+-- ABS: độ lệch so với mức tồn kho chuẩn 50 cái
+SELECT name,
+       stock,
+       ABS(stock - 50) AS lech_so_voi_50
+FROM products
+ORDER BY lech_so_voi_50 DESC, name;
+```
+</Playground>
+
+Phin nhôm 45000 đồng thành 48600 đồng; Arabica 165000 thành 178200; ly sứ 89000 thành 96120. Phép nhân với `1.08` (số thập phân) cho ra số thập phân, `ROUND` đưa về số tròn. Nhìn cột `chua_lam_tron` của Robusta: `120000 * 1.08` trên SQLite ra `129600.00000000001`, không phải `129600`. Số thực trong máy tính được lưu gần đúng, nên đôi khi lệch một chút ở chữ số rất xa; ở đây `ROUND` dọn được phần lệch đó. (PostgreSQL tính phép nhân này bằng kiểu số chính xác nên không lệch.)
+
+<Callout type="note" title="Sai số của số thực khi làm tròn">
+Sai số này không phải lúc nào cũng vô hại. Trên SQLite, `ROUND(1.65, 1)` ra **1.6** chứ không phải 1.7, vì số 1.65 thật ra được lưu thành một số nhỏ hơn 1.65 một chút. PostgreSQL dùng kiểu số chính xác cho những phép tính như vậy nên ra 1.7. Đây là lý do tiền bạc nên được lưu và tính bằng số nguyên (đồng) hoặc kiểu số thập phân chính xác, như bài 26 sẽ nói.
+</Callout>
+
+Bảng thứ hai dùng `ABS`. `ABS` hữu ích khi bạn quan tâm **độ lệch** chứ không quan tâm lệch lên hay xuống. Ở đây cửa hàng muốn giữ mỗi sản phẩm khoảng 50 cái trong kho. Bánh đậu xanh (150 cái) lệch nhiều nhất: 100. Phin nhôm (120 cái) lệch 70. Bình giữ nhiệt và bánh pía (0 cái) cùng thiếu 50. Cà phê Robusta (80 cái) và trà shan tuyết (20 cái) cùng lệch 30, dù một bên thừa 30 còn một bên thiếu 30: `ABS` bỏ dấu nên không phân biệt hai trường hợp này. Cà phê Culi có đúng 50 cái nên lệch 0 và đứng cuối.
+
+<Callout type="warn" title="ROUND không cứu được phép chia số nguyên">
+`ROUND(89000 / 100000, 1)` ra `0`, không phải `0.9`. Phép chia số nguyên ở bài 3 xảy ra **trước**, cho ra 0, rồi `ROUND` mới làm tròn số 0 đó. Muốn có `0.9`, phép chia phải giữ phần thập phân từ đầu: `ROUND(89000 / 100000.0, 1)`.
+</Callout>
+
+## Hàm xử lý ngày tháng
+
+Trong SQLite, hàm chính là `STRFTIME(định_dạng, ngày)`: nó lấy một ngày và trả về **chuỗi** theo định dạng bạn chọn. `%Y` là năm 4 chữ số, `%m` là tháng 2 chữ số, `%d` là ngày 2 chữ số (ví dụ `05`).
+
+<Playground>
+```sql
+SELECT id,
+       ordered_on,
+       STRFTIME('%Y', ordered_on) AS nam,
+       STRFTIME('%m', ordered_on) AS thang
+FROM orders
+WHERE STRFTIME('%Y-%m', ordered_on) = '2025-11';
+```
+</Playground>
+
+Kết quả có **5 đơn** đặt trong tháng 11 năm 2025 (đơn 16 tới 20). Cột `nam` là `2025`, cột `thang` là `11`. Điều kiện (condition) `STRFTIME('%Y-%m', ordered_on) = '2025-11'` lấy phần năm-tháng của mỗi ngày và so với `'2025-11'`.
+
+Chú ý: kết quả của `STRFTIME` là **chuỗi** `'11'`, không phải số `11`. Phần Lỗi hay gặp bên dưới cho thấy vì sao điều này quan trọng.
+
+PostgreSQL **không có** `STRFTIME`; gọi nó sẽ báo lỗi `function strftime(unknown, date) does not exist`. PostgreSQL dùng `EXTRACT`, ví dụ `EXTRACT(YEAR FROM ordered_on)`, và lộ trình PostgreSQL sẽ dạy kỹ các hàm ngày giờ của nó. Khi chuyển câu truy vấn (query) có xử lý ngày tháng sang database khác, đây thường là phần phải viết lại.
+
+## Đổi kiểu dữ liệu: CAST
+
+`CAST(giá_trị AS kiểu)` đổi một giá trị sang kiểu dữ liệu khác: `INTEGER` (số nguyên), `REAL` (số thực), `TEXT` (chữ). Bài 7 đã hẹn một việc cần đến `CAST`: trên PostgreSQL, `COALESCE(shipped_on, 'chưa gửi')` báo lỗi vì trộn ngày với chữ. Đổi ngày thành chữ trước là hết lỗi. Ô dưới đây có hai câu lệnh: câu đầu sửa lỗi đó, câu sau dùng `CAST` cho một việc khác.
+
+<Playground>
+```sql
+-- Sửa lỗi COALESCE trộn ngày với chữ của bài 7
+SELECT id,
+       status,
+       COALESCE(CAST(shipped_on AS TEXT), 'chưa gửi') AS ngay_gui
+FROM orders
+WHERE customer_id = 1;
+
+-- Sửa bẫy chia số nguyên: coi giá là số thực
+SELECT name,
+       price / 100000 AS chia_so_nguyen,
+       CAST(price AS REAL) / 100000 AS chia_so_thuc
+FROM products
+WHERE price < 100000;
+```
+</Playground>
+
+Bảng đầu có 4 đơn của chị Hà. Ba đơn đã gửi hiện ngày gửi (2025-03-04, 2025-04-16, 2025-09-11); đơn 18 chưa gửi hiện `chưa gửi`. Câu này chạy được trên cả SQLite lẫn PostgreSQL: `CAST(shipped_on AS TEXT)` biến ngày thành chữ, nên cả hai giá trị trong `COALESCE` đều là chữ.
+
+Bảng sau cho thấy `CAST` còn sửa được bẫy chia số nguyên của bài 3, theo cách rõ ràng hơn `100000.0` vì nó nói thẳng ý định "hãy coi giá là số thực". Bốn sản phẩm dưới 100000 đồng đều có `chia_so_nguyen` bằng 0, còn `chia_so_thuc` giữ phần thập phân: phin nhôm 0.45, ly sứ 0.89, bánh pía 0.75, bánh đậu xanh 0.55. Một lưu ý: trên PostgreSQL, `ROUND(…, n)` không nhận số thực kiểu `REAL`, nên nếu định làm tròn tới n chữ số thập phân, hãy dùng `100000.0` thay cho `CAST(… AS REAL)`.
+
+## Bên trong database: hàm trên cột trong WHERE
+
+Khi bạn viết `WHERE STRFTIME('%Y-%m', ordered_on) = '2025-11'`, database phải tính `STRFTIME` cho **từng hàng** của bảng rồi mới so sánh. Với 20 đơn, việc này tức thời. Với hàng triệu đơn, nó có thể chậm, vì database không tận dụng được index (chỉ mục) trên cột `ordered_on`: index sắp xếp theo giá trị gốc của cột, không theo kết quả của hàm. Bài 31 sẽ nói kỹ về index. Còn bây giờ, hãy nhớ rằng với khoảng thời gian, cách viết ở bài 5 và 6 (`ordered_on >= '2025-11-01' AND ordered_on < '2025-12-01'`) vừa chạy được trên mọi database, vừa thường nhanh hơn.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="So kết quả STRFTIME với số">
+`STRFTIME` trả về chuỗi. So nó với một con số không báo lỗi mà trả về **0 hàng**:
+</Callout>
+
+<Playground>
+```sql
+-- Sai: so chuỗi với số
+SELECT id, ordered_on
+FROM orders
+WHERE STRFTIME('%m', ordered_on) = 10;
+
+-- Đúng: đổi kết quả sang số trước khi so
+SELECT id, ordered_on
+FROM orders
+WHERE CAST(STRFTIME('%m', ordered_on) AS INTEGER) = 10;
+```
+</Playground>
+
+Bảng đầu rỗng, dù có 3 đơn đặt trong tháng 10. Kết quả của `STRFTIME` là chuỗi và không gắn với cột nào, nên SQLite không tự đổi nó sang số: chuỗi `'10'` so với số `10` ra sai. (Khi một vế là **cột** của bảng, SQLite lại tự đổi kiểu theo kiểu khai báo của cột, nên `WHERE id = '13'` vẫn tìm được đơn 13. Đừng dựa vào sự dễ dãi này.) Bảng thứ hai có đủ 3 đơn (13, 14, 15), vì `CAST(... AS INTEGER)` đã đổi `'10'` thành số `10`. Cách sửa khác là so với chuỗi: `= '10'`.
+
+<Callout type="warn" title="SUBSTR bắt đầu từ 1">
+`SUBSTR(phone, 0, 3)` không lấy 3 ký tự đầu mà chỉ lấy **2** (`'09'`), vì không có ký tự ở vị trí 0. Trong SQL, vị trí luôn đếm từ 1.
+</Callout>
+
+<Callout type="warn" title="UPPER/LOWER với tiếng Việt trên SQLite">
+`UPPER('Hà Nội')` ra `Hà NộI`. Nếu cần chuẩn hóa chữ tiếng Việt, hãy làm ở PostgreSQL hoặc ngay trong ứng dụng, đừng dựa vào `UPPER`/`LOWER` của SQLite.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| `UPPER('Hà Nội')` | `Hà NộI` | `HÀ NỘI` | `HÀ NỘI` |
+| Lấy năm từ ngày | `STRFTIME('%Y', d)` (chuỗi) | `EXTRACT(YEAR FROM d)` (số) | `YEAR(d)` (số) |
+| Độ dài theo ký tự | `LENGTH` | `LENGTH` | `CHAR_LENGTH` (`LENGTH` đếm byte) |
+| `CAST(x AS TEXT)` | có | có | dùng `CAST(x AS CHAR)` |
+| `CAST(x AS INTEGER)` | có | có | dùng `CAST(x AS SIGNED)` |
+| `ROUND(số_thực, n)` | có | lỗi (dùng `100000.0` thay cho `CAST(… AS REAL)`) | có |
+
+Hàng `LENGTH` của MySQL là một cái bẫy với tiếng Việt: `LENGTH('Hà Nội')` trên MySQL đếm số **byte**, và mỗi chữ có dấu chiếm nhiều byte, nên kết quả lớn hơn 6. Lộ trình MySQL sẽ nói kỹ.
+
+## Tóm tắt
+
+- Hàm được tính cho từng hàng và dùng được ở `SELECT`, `WHERE`, `ORDER BY`. Hầu hết hàm nhận NULL thì trả về NULL.
+- Chuỗi: `SUBSTR(s, vị_trí, số_ký_tự)` (vị trí bắt đầu từ 1), `LENGTH`, `REPLACE`, `TRIM`, `UPPER`, `LOWER`. Trên SQLite, `UPPER`/`LOWER` chỉ đổi chữ không dấu.
+- Số: `ROUND(x, n)`, `ABS(x)`. `ROUND` không sửa được phép chia số nguyên đã xảy ra trước nó.
+- Ngày (SQLite): `STRFTIME('%Y-%m', ngày)` trả về **chuỗi**; so với số sẽ ra 0 hàng. PostgreSQL dùng `EXTRACT`, MySQL dùng `YEAR`.
+- `CAST(x AS kiểu)` đổi kiểu dữ liệu; ví dụ `COALESCE(CAST(shipped_on AS TEXT), 'chưa gửi')` chạy được trên cả SQLite và PostgreSQL.
+- Hàm áp lên cột trong `WHERE` có thể làm truy vấn chậm trên bảng lớn; với khoảng thời gian, ưu tiên `>= … AND < …`.
+
+## Bài tập
+
+<Exercise hint="REPLACE đổi một đoạn chữ thành đoạn khác. Khách chưa có email thì không cần.">
+Cửa hàng chuyển sang tên miền mới: mọi email `@example.com` đổi thành `@cuahang.vn`. Với các khách **ở Hà Nội có email**, lấy 2 cột theo thứ tự: tên khách, email mới.
+
+```sql
+SELECT name,
+       REPLACE(email, '@example.com', '@cuahang.vn') AS email_moi
+FROM customers
+WHERE city = 'Hà Nội'
+  AND email IS NOT NULL;
+```
+</Exercise>
+
+<Exercise hint="Hàm dùng được trong WHERE, giống như trong SELECT. Chênh lệch không phân biệt cao hơn hay thấp hơn.">
+Một khách hỏi mua quà **tầm giá 150000 đồng**, chấp nhận chênh lệch (đắt hơn hoặc rẻ hơn) **không quá 20000 đồng**. Dùng `ABS` để tìm các sản phẩm phù hợp. Kết quả gồm 2 cột theo thứ tự: `name`, `price`.
+
+```sql
+SELECT name, price
+FROM products
+WHERE ABS(price - 150000) <= 20000;
+```
+</Exercise>
+
+<Exercise hint="Phép chia xảy ra trước ROUND. Nhớ bẫy chia số nguyên ở bài 3." starter={"SELECT name,\n       ROUND(price / 100000) AS gia_tram_nghin\nFROM products;\n"}>
+Câu lệnh có sẵn trong ô muốn lấy giá theo đơn vị "trăm nghìn đồng", **làm tròn tới số nguyên** (ví dụ ly sứ 89000 đồng thành 1, máy xay 450000 đồng thành 5), nhưng nhiều giá bị làm tròn sai. Hãy sửa cho đúng, giữ nguyên 2 cột.
+
+```sql
+SELECT name,
+       ROUND(price / 100000.0) AS gia_tram_nghin
+FROM products;
+```
+</Exercise>
+
+<Exercise hint="STRFTIME trả về gì? Đọc lại phần Lỗi hay gặp.">
+Tìm các đơn **đã giao** được đặt trong **nửa đầu tháng** (ngày 1 tới ngày 15 của tháng, tính cả ngày 15). Kết quả gồm 2 cột theo thứ tự: `id`, `ordered_on`.
+
+```sql
+SELECT id, ordered_on
+FROM orders
+WHERE status = 'đã giao'
+  AND CAST(STRFTIME('%d', ordered_on) AS INTEGER) <= 15;
+```
+</Exercise>
+
+<Exercise hint="Năm tài chính là một khoảng ngày; xem lại phần Bên trong database.">
+Cửa hàng tính "năm tài chính" từ ngày 2024-07-01 tới trước ngày 2025-07-01. Liệt kê những khách **đăng ký trong năm tài chính đó**, kèm **tháng** đăng ký (dạng 2 chữ số như `01`), sắp theo **ngày đăng ký từ sớm tới muộn** (khách đăng ký tháng 7 năm 2024 đứng đầu). Kết quả gồm 2 cột theo thứ tự: tên khách, tháng đăng ký.
+
+```sql
+SELECT name,
+       STRFTIME('%m', joined_on) AS thang
+FROM customers
+WHERE joined_on >= '2024-07-01'
+  AND joined_on < '2025-07-01'
+ORDER BY joined_on;
+```
+</Exercise>
+
+Bạn đã biến đổi được từng giá trị. Nhưng đôi khi bạn muốn **phân loại** chúng, ví dụ gắn nhãn "rẻ", "vừa", "đắt" cho từng sản phẩm tùy theo giá. Bài tiếp theo giới thiệu `CASE`, cách viết "nếu… thì…" trong SQL.

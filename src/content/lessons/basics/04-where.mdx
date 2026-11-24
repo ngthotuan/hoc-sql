@@ -1,0 +1,268 @@
+---
+title: Lọc hàng với WHERE
+description: Chỉ giữ lại những hàng thỏa một điều kiện, so sánh số, chữ và ngày tháng, và hiểu database xử lý WHERE theo thứ tự nào.
+order: 4
+---
+
+Ba bài vừa qua, mọi câu truy vấn (query) của bạn đều trả về **tất cả** các hàng (row) của bảng (table). Với 12 khách hàng thì không sao, nhưng một cửa hàng thật có thể có hàng chục nghìn khách. Khi chủ cửa hàng hỏi "khách ở Hà Nội là những ai?", bạn không muốn đọc cả danh sách rồi tự lọc bằng mắt.
+
+`SELECT` giúp bạn chọn **cột** (column). Bài này giới thiệu mệnh đề (clause) **WHERE**, giúp bạn chọn **hàng**: chỉ giữ lại những hàng thỏa một điều kiện (condition).
+
+## WHERE giữ lại hàng thỏa điều kiện
+
+Mệnh đề `WHERE` đứng sau `FROM`, theo sau là một điều kiện:
+
+<Playground>
+```sql
+SELECT name, city
+FROM customers
+WHERE city = 'Hà Nội';
+```
+</Playground>
+
+Kết quả (result set) chỉ còn **4 hàng**: Nguyễn Thu Hà, Đặng Gia Linh, Ngô Đức Thịnh và Dương Hải Yến, cả bốn đều ở Hà Nội. Tám khách còn lại bị loại khỏi kết quả (nhưng vẫn còn nguyên trong bảng).
+
+Điều kiện `city = 'Hà Nội'` được database kiểm tra **cho từng hàng một**. Với hàng của chị Hà, `city` là `'Hà Nội'`, so sánh cho kết quả đúng, hàng được giữ. Với hàng của Trần Minh Khoa, `city` là `'TP.HCM'`, so sánh cho kết quả sai, hàng bị bỏ. Lặp lại như vậy cho cả 12 hàng, những hàng được giữ tạo thành kết quả.
+
+Chú ý cách viết: `'Hà Nội'` nằm trong **nháy đơn** vì đó là một giá trị chữ, còn `city` không có nháy vì đó là tên cột. Đây là cách database phân biệt "tên của một cột" với "một đoạn chữ cụ thể".
+
+## Các phép so sánh
+
+Ngoài dấu bằng, bạn có thể dùng các phép so sánh sau:
+
+| Phép so sánh | Ý nghĩa | Ví dụ |
+|---|---|---|
+| `=` | bằng | `city = 'Hà Nội'` |
+| `<>` | khác | `status <> 'đã giao'` |
+| `<` | nhỏ hơn | `price < 100000` |
+| `>` | lớn hơn | `price > 145000` |
+| `<=` | nhỏ hơn hoặc bằng | `stock <= 10` |
+| `>=` | lớn hơn hoặc bằng | `joined_on >= '2025-01-01'` |
+
+`<>` là cách viết chuẩn của "khác". Bạn cũng sẽ thấy `!=` trong nhiều tài liệu; SQLite, PostgreSQL và MySQL đều hiểu cả hai, nhưng khóa học dùng `<>`.
+
+Với số, các phép so sánh hoạt động đúng như bạn nghĩ. Cần cẩn thận với **ranh giới**: `>` và `>=` chỉ khác nhau ở giá trị đúng bằng mốc, nhưng chính chỗ đó hay gây sai sót:
+
+<Playground>
+```sql
+SELECT name, price
+FROM products
+WHERE price > 145000;
+
+SELECT name, price
+FROM products
+WHERE price >= 145000;
+```
+</Playground>
+
+Ô này có hai câu truy vấn, nên trả về hai bảng kết quả. Bảng đầu có **5 hàng**, bảng sau có **6 hàng**. Hàng chênh lệch là cà phê Culi 500g, giá **đúng bằng** 145000: nó không lớn hơn 145000, nhưng lớn hơn hoặc bằng 145000. Khi đề bài nói "từ 145000 trở lên", bạn cần `>=`; khi nói "trên 145000", bạn cần `>`.
+
+Phép "khác" `<>` giữ lại các hàng có giá trị **khác** giá trị cho trước. Ví dụ, các đơn chưa hoàn tất (chưa ở trạng thái "đã giao"):
+
+<Playground>
+```sql
+SELECT id,
+       ordered_on,
+       status
+FROM orders
+WHERE status <> 'đã giao';
+```
+</Playground>
+
+Kết quả có **8 đơn**: 2 đơn đã hủy (4 và 12), 3 đơn đang giao (15, 16, 19) và 3 đơn chờ xác nhận (17, 18, 20). Bảng có 20 đơn, 12 đơn đã giao bị loại, còn lại đúng 8.
+
+<Callout type="note" title="Hàng có NULL không qua được phép so sánh nào">
+Phép tính trên đúng vì cột `status` không có NULL. Với cột có NULL thì khác: cột `phone` có 5 khách là NULL, và `WHERE phone <> '0912345678'` chỉ trả về **6** khách, không phải 11. Hàng có NULL không thỏa bất kỳ phép so sánh nào, kể cả `<>`. Bài 7 sẽ giải thích vì sao.
+</Callout>
+
+## So sánh chữ: phải khớp từng ký tự
+
+Khi so sánh chữ bằng `=`, SQLite và PostgreSQL so **từng ký tự một**, kể cả chữ hoa, chữ thường và dấu tiếng Việt. Người ta nói phép so sánh này **phân biệt hoa thường** (case-sensitive):
+
+<Playground>
+```sql
+SELECT name, city
+FROM customers
+WHERE city = 'hà nội';
+```
+</Playground>
+
+Kết quả **không có hàng nào**. Trong bảng, thành phố được ghi là `'Hà Nội'` với chữ H và N viết hoa; `'hà nội'` viết thường nên không khớp. Tương tự, `'Ha Noi'` (không dấu) hay `'Hà Nội '` (thừa một dấu cách ở cuối) cũng không khớp.
+
+<Callout type="try">
+Sửa điều kiện ở ô trên lần lượt thành `'Ha Noi'`, rồi `'Hà Nội '` (có một dấu cách ở cuối), rồi `'Hà Nội'`. Chỉ lần cuối có kết quả.
+</Callout>
+
+Kết quả rỗng không phải là lỗi: câu lệnh (statement) hợp lệ, chỉ là không hàng nào thỏa điều kiện. Đây là điều dễ gây nhầm: database không báo "có lẽ bạn gõ sai", nó lặng lẽ trả về 0 hàng. Khi kết quả rỗng một cách đáng ngờ, hãy kiểm tra lại chính xác giá trị trong bảng bằng cách xem vài hàng của cột đó.
+
+Lưu ý điều này khác với bài 2: **tên** cột, tên bảng và từ khóa (keyword) không phân biệt hoa thường, nhưng **giá trị** chữ nằm trong dữ liệu thì có (trên SQLite và PostgreSQL). `CITY` và `city` là cùng một cột, nhưng `'Hà Nội'` và `'hà nội'` là hai giá trị khác nhau.
+
+MySQL là ngoại lệ đáng nhớ: với cài đặt mặc định từ MySQL 8, MySQL coi `'Hà Nội'`, `'hà nội'` và cả `'Ha Noi'` là **bằng nhau**. Cách một database so sánh chữ được quy định bởi một thiết lập gọi là collation; lộ trình MySQL sẽ nói kỹ về nó.
+
+## So sánh ngày tháng
+
+Các cột ngày trong dataset được ghi theo dạng `năm-tháng-ngày`, ví dụ `'2025-01-03'`. Khi so sánh, bạn viết ngày trong nháy đơn:
+
+<Playground>
+```sql
+SELECT name, joined_on
+FROM customers
+WHERE joined_on >= '2025-01-01';
+```
+</Playground>
+
+Kết quả có **7 khách** đăng ký từ đầu năm 2025 trở đi, sớm nhất là Đặng Gia Linh (2025-01-03), muộn nhất là Dương Hải Yến (2025-10-02).
+
+Bên dưới, mỗi database xử lý câu này theo cách riêng:
+
+- **PostgreSQL và MySQL** có kiểu dữ liệu (data type) ngày thật (`DATE`). Chúng hiểu `'2025-01-01'` là một ngày và so sánh như so sánh ngày trên lịch.
+- **SQLite** không có kiểu ngày riêng: trong các ô thực hành, ngày được lưu như **chữ**, và phép so sánh ở trên thật ra là so sánh chữ, từng ký tự từ trái sang phải.
+
+Với SQLite, so sánh chữ vẫn cho kết quả đúng nhờ một tính chất của dạng `năm-tháng-ngày` viết đủ chữ số: so từng ký tự từ trái sang phải cũng chính là so năm trước, rồi tháng, rồi ngày. `'2024-12-31'` nhỏ hơn `'2025-01-01'` vì ký tự thứ tư `4` nhỏ hơn `5`. Đó là lý do dataset ghi ngày theo đúng dạng này. Nhưng tính chất đó chỉ đúng khi ngày viết **đủ hai chữ số** cho tháng và ngày. Thử viết thiếu số 0:
+
+<Playground>
+```sql
+SELECT name, joined_on
+FROM customers
+WHERE joined_on >= '2025-1-1';
+```
+</Playground>
+
+SQLite chỉ trả về **1 khách** (Dương Hải Yến, 2025-10-02), thay vì 7. Khi so từng ký tự, `'2025-01-03'` có ký tự thứ sáu là `0`, còn `'2025-1-1'` có ký tự thứ sáu là `1`, nên `'2025-01-03'` bị coi là nhỏ hơn. Chỉ ngày tháng 10 lọt qua, vì `'2025-10-02'` lớn hơn `'2025-1-1'` khi so ký tự. PostgreSQL thì hiểu `'2025-1-1'` là ngày 1 tháng 1 và trả về đủ 7 khách. Bài học: **luôn viết ngày đủ dạng `YYYY-MM-DD`**, ví dụ `'2025-01-01'`, để câu lệnh đúng ở mọi database.
+
+## WHERE với biểu thức
+
+Hai bên phép so sánh không nhất thiết là cột và giá trị cố định. Bạn có thể so sánh một **biểu thức** (expression) đã học ở bài 3. Ví dụ, tìm các hàng trong `order_items` có thành tiền từ 300000 đồng trở lên:
+
+<Playground>
+```sql
+SELECT order_id,
+       product_id,
+       quantity * unit_price AS thanh_tien
+FROM order_items
+WHERE quantity * unit_price >= 300000;
+```
+</Playground>
+
+Kết quả có **9 hàng**. Có hàng của `order_items` đạt mốc vì đơn giá cao, như máy xay cà phê ở đơn 4 (1 cái, 450000 đồng). Có hàng đạt mốc vì số lượng nhiều, như đơn 17 mua 6 hộp bánh đậu xanh giá 55000, thành 330000 đồng. Database tính `quantity * unit_price` cho từng hàng rồi mới so sánh với 300000.
+
+Vì sao phải viết lại cả biểu thức trong `WHERE`, thay vì dùng luôn bí danh (alias) `thanh_tien`? Câu trả lời nằm ở thứ tự database xử lý câu lệnh.
+
+## Bên trong database: WHERE chạy trước SELECT
+
+Bạn viết `SELECT` đầu tiên, nhưng database không xử lý theo thứ tự bạn viết. Với một câu truy vấn có `SELECT`, `FROM` và `WHERE`, thứ tự xử lý về mặt logic là:
+
+1. **FROM**: xác định lấy dữ liệu từ bảng nào.
+2. **WHERE**: kiểm tra điều kiện trên từng hàng, bỏ những hàng không thỏa.
+3. **SELECT**: từ những hàng còn lại, tính các biểu thức, chọn các cột và đặt bí danh.
+
+Thứ tự này giải thích hai điều:
+
+- **WHERE có thể dùng cột không có trong SELECT.** Ví dụ `SELECT name FROM customers WHERE city = 'Hà Nội';` lọc theo `city` dù kết quả không hiện cột `city`. Lúc WHERE chạy, hàng vẫn còn đủ mọi cột.
+- **WHERE không thấy được bí danh đặt trong SELECT**, vì bí danh chỉ được tạo ở bước 3, sau khi WHERE đã chạy xong.
+
+Các bài sau sẽ thêm những mệnh đề mới vào danh sách này. Nắm thứ tự xử lý này giúp bạn hiểu nhiều lỗi thường gặp. (Đây là thứ tự logic: bên trong, database có thể thực hiện khác đi để chạy nhanh hơn, nhưng kết quả luôn như thể nó làm đúng thứ tự này.)
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Dùng bí danh của SELECT trong WHERE">
+Dùng bí danh đặt ở `SELECT` bên trong `WHERE` chạy được trên SQLite, nhưng PostgreSQL và MySQL báo lỗi không tìm thấy cột. Cách nhận biết: thông báo lỗi nêu đúng tên bí danh. Cách sửa: viết lại cả biểu thức trong `WHERE`. Chạy thử câu dưới đây trên SQLite:
+</Callout>
+
+<Playground>
+```sql
+SELECT order_id,
+       quantity * unit_price AS thanh_tien
+FROM order_items
+WHERE thanh_tien >= 400000;
+```
+</Playground>
+
+SQLite trả về 3 hàng (đơn 4, 12 và 14), vì SQLite tự cho phép dùng bí danh trong WHERE như một tiện ích riêng. PostgreSQL thì làm đúng theo thứ tự xử lý ở trên, và báo lỗi `column "thanh_tien" does not exist`: lúc chạy WHERE, chưa có cột nào tên `thanh_tien`. Để câu lệnh chạy được ở mọi database, hãy viết lại biểu thức trong WHERE như ví dụ ở phần trước.
+
+<Callout type="warn" title="Quên nháy đơn, hoặc dùng nháy kép cho chữ">
+`WHERE city = Hà Nội` (không có nháy) làm database báo lỗi cú pháp, vì nó cố hiểu `Hà` và `Nội` là tên cột hoặc từ khóa. Còn `WHERE city = "Hà Nội"` (nháy kép) là một cái bẫy: SQLite vẫn chạy và trả về 4 hàng, nhưng PostgreSQL báo `column "Hà Nội" does not exist`, vì với PostgreSQL, nháy kép dùng cho **tên** (như bí danh có dấu cách ở bài 3), không phải cho giá trị chữ. Quy tắc: giá trị chữ và ngày tháng luôn nằm trong **nháy đơn**.
+</Callout>
+
+<Callout type="warn" title="Kết quả rỗng vì sai một ký tự">
+`WHERE status = 'da giao'` hay `WHERE city = 'Ha Noi'` không báo lỗi mà trả về 0 hàng. Khi lọc theo chữ, hãy chép đúng giá trị từ kết quả của một câu `SELECT` trước đó thay vì gõ theo trí nhớ.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL (mặc định) |
+|---|---|---|---|
+| `'Hà Nội' = 'hà nội'` | sai | sai | **đúng** |
+| Bí danh của SELECT dùng trong WHERE | chạy được | lỗi | lỗi |
+| Chuỗi trong nháy kép `"Hà Nội"` | chạy được (nếu không trùng tên cột) | lỗi | chạy được |
+| Kiểu ngày | lưu như chữ | `DATE` thật | `DATE` thật |
+| `'2025-1-1'` (thiếu số 0) | so sai | hiểu đúng | hiểu đúng |
+
+Vì các ô thực hành chạy SQLite, hãy nhớ những điểm mà SQLite "dễ dãi": câu chạy được ở đây chưa chắc chạy được ở database bạn dùng khi đi làm.
+
+## Tóm tắt
+
+- `WHERE <điều kiện>` đứng sau `FROM`, giữ lại những hàng làm điều kiện đúng. Database kiểm tra điều kiện cho từng hàng.
+- Sáu phép so sánh: `=`, `<>`, `<`, `>`, `<=`, `>=`. Cẩn thận với ranh giới: `>` loại giá trị bằng mốc, `>=` giữ lại.
+- Trên SQLite và PostgreSQL, so sánh chữ phân biệt hoa thường, dấu và khoảng trắng. MySQL mặc định không phân biệt hoa thường và dấu. Giá trị chữ và ngày đặt trong nháy đơn.
+- Viết ngày đủ dạng `YYYY-MM-DD`. SQLite lưu ngày như chữ nên viết thiếu số 0 sẽ so sai; PostgreSQL và MySQL có kiểu ngày thật.
+- Hàng có NULL không thỏa phép so sánh nào, kể cả `<>` (bài 7).
+- Thứ tự xử lý: FROM → WHERE → SELECT. Vì vậy WHERE lọc được theo cột không có trong SELECT, nhưng không dùng được bí danh đặt trong SELECT (SQLite là ngoại lệ, đừng dựa vào nó).
+- Kết quả rỗng không phải lỗi; khi nó đáng ngờ, hãy kiểm tra lại giá trị chính xác trong bảng.
+
+## Bài tập
+
+<Exercise hint="Danh mục được ghi là 'Trà', có dấu, viết hoa chữ T.">
+Lấy tên và giá của các sản phẩm thuộc danh mục Trà. Kết quả gồm 2 cột theo thứ tự: `name`, `price`.
+
+```sql
+SELECT name, price
+FROM products
+WHERE category = 'Trà';
+```
+</Exercise>
+
+<Exercise hint="'Từ ngày ... trở đi' nghĩa là kể cả ngày đó. Viết ngày đủ dạng năm-tháng-ngày.">
+Lấy các đơn hàng đặt từ ngày 30 tháng 10 năm 2025 trở đi. Kết quả gồm 3 cột theo thứ tự: `id`, `ordered_on`, `status`.
+
+```sql
+SELECT id,
+       ordered_on,
+       status
+FROM orders
+WHERE ordered_on >= '2025-10-30';
+```
+</Exercise>
+
+<Exercise hint="Dùng phép so sánh 'khác'. Thành phố được ghi là 'TP.HCM'.">
+Lấy tên và thành phố của những khách **không** ở TP.HCM. Kết quả gồm 2 cột theo thứ tự: `name`, `city`.
+
+```sql
+SELECT name, city
+FROM customers
+WHERE city <> 'TP.HCM';
+```
+</Exercise>
+
+<Exercise hint="Đọc thông báo lỗi: database nghĩ Bánh là gì? Giá trị chữ cần được đặt trong loại nháy nào?" starter={"SELECT name, price\nFROM products\nWHERE category = Bánh;\n"}>
+Câu lệnh có sẵn trong ô muốn lấy tên và giá của các sản phẩm thuộc danh mục Bánh, nhưng chạy thì báo lỗi `no such column: Bánh`. Hãy sửa cho đúng, giữ nguyên 2 cột `name`, `price`.
+
+```sql
+SELECT name, price
+FROM products
+WHERE category = 'Bánh';
+```
+</Exercise>
+
+<Exercise hint="Giá trị tồn kho là stock * price. Viết lại biểu thức trong WHERE, không dùng bí danh.">
+Tìm các sản phẩm có giá trị hàng tồn kho (số lượng còn nhân giá bán) **dưới** 5000000 đồng. Kết quả gồm 2 cột theo thứ tự: tên sản phẩm, và giá trị tồn kho.
+
+```sql
+SELECT name,
+       stock * price AS gia_tri_ton_kho
+FROM products
+WHERE stock * price < 5000000;
+```
+</Exercise>
+
+Bài này mỗi lần chỉ lọc theo **một** điều kiện. Câu hỏi thực tế thường cần nhiều điều kiện cùng lúc, ví dụ "sản phẩm thuộc danh mục Dụng cụ **và** giá dưới 100000 đồng". Bài tiếp theo sẽ dạy cách kết hợp điều kiện bằng `AND`, `OR` và `NOT`.

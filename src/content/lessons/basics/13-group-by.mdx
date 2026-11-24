@@ -1,0 +1,283 @@
+---
+title: Gom nhóm với GROUP BY
+description: Chia các hàng thành nhóm và tính hàm tổng hợp cho từng nhóm với GROUP BY; nắm quy tắc cột nào được đứng trong SELECT, và gom nhóm theo nhiều cột hoặc theo biểu thức.
+order: 13
+---
+
+Bài 12 gộp **cả bảng** (table) thành một hàng (row): 12 sản phẩm, tổng tồn kho 580 món, giá trung bình 179083 đồng. Nhưng chủ cửa hàng thường muốn hỏi chi tiết hơn: **mỗi danh mục** có bao nhiêu sản phẩm? **Mỗi khách** đã đặt bao nhiêu đơn? Đơn hàng ở **mỗi trạng thái** là bao nhiêu?
+
+Bạn có thể viết bốn câu lệnh (statement) với `WHERE category = 'Bánh'`, `WHERE category = 'Cà phê'`… nhưng cách đó dài, và bạn phải biết trước có những danh mục nào. Bài này giới thiệu `GROUP BY`: chia các hàng thành nhóm theo giá trị của một cột, rồi tính hàm tổng hợp (aggregate function) **riêng cho từng nhóm**.
+
+## GROUP BY: một hàng kết quả cho mỗi nhóm
+
+Đặt `GROUP BY` sau `FROM` (và sau `WHERE` nếu có), kèm tên cột dùng để chia nhóm:
+
+<Playground>
+```sql
+SELECT category,
+       COUNT(*) AS so_san_pham,
+       MIN(price) AS re_nhat,
+       MAX(price) AS dat_nhat,
+       SUM(stock) AS ton_kho
+FROM products
+GROUP BY category
+ORDER BY category;
+```
+</Playground>
+
+Bảng `products` có 12 hàng, nhưng kết quả (result set) chỉ có **4 hàng**, mỗi danh mục một hàng. Database đã chia 12 sản phẩm thành 4 nhóm theo giá trị cột (column) `category`, rồi tính `COUNT`, `MIN`, `MAX`, `SUM` riêng trong từng nhóm. Nhóm Bánh có 2 sản phẩm, giá từ 55000 tới 75000, tồn 150 món. Nhóm Dụng cụ có 4 sản phẩm, trải từ phin nhôm 45000 tới máy xay 450000, tồn 192 món. Cộng cột `so_san_pham` lại: 2 + 3 + 4 + 3 = 12, đúng bằng số sản phẩm. Mỗi sản phẩm thuộc đúng một nhóm.
+
+Hãy hình dung `GROUP BY` làm hai việc:
+
+1. **Chia nhóm**: xếp các hàng có cùng giá trị `category` vào cùng một "chồng". Có bao nhiêu giá trị khác nhau thì có bấy nhiêu chồng, giống `DISTINCT` ở bài 9.
+2. **Thu gọn**: mỗi chồng biến thành **một hàng** kết quả. Hàm tổng hợp được tính trên các hàng trong chồng đó, như bài 12 đã tính trên cả bảng.
+
+Một câu lệnh có hàm tổng hợp mà không có `GROUP BY`, như ở bài 12, thực ra là trường hợp đặc biệt: cả bảng là **một nhóm duy nhất**. Nhóm này luôn tồn tại, nên dù `WHERE` loại hết hàng, bài 12 vẫn nhận 1 hàng với `COUNT(*)` bằng 0. Có `GROUP BY` thì khác: không còn hàng nào thì không có nhóm nào, và kết quả có **0 hàng**.
+
+### Đếm theo nhóm
+
+Cách dùng phổ biến nhất là đếm mỗi nhóm có bao nhiêu hàng:
+
+<Playground>
+```sql
+SELECT status,
+       COUNT(*) AS so_don
+FROM orders
+GROUP BY status
+ORDER BY so_don DESC, status;
+```
+</Playground>
+
+Bốn trạng thái, bốn hàng: `đã giao` 12 đơn, `chờ xác nhận` 3, `đang giao` 3, `đã hủy` 2. Tổng cộng 20, đúng bằng số đơn. `ORDER BY` sắp theo bí danh (alias) `so_don` của hàm tổng hợp, giảm dần. Hai trạng thái cùng 3 đơn hòa nhau, nên cột phụ `status` quyết định thứ tự giữa chúng, như bài 8 đã dặn.
+
+<Callout type="try">
+Bỏ dòng `ORDER BY` rồi chạy lại. SQLite có thể trả các nhóm theo thứ tự chữ của `status`, vì nó thường sắp xếp để chia nhóm (xem phần Bên trong database); PostgreSQL thì trả theo thứ tự khác. Đó là sự tình cờ của cách thực hiện, không phải lời hứa: `GROUP BY` chỉ chia nhóm, **không** hứa sắp xếp. Cần thứ tự thì luôn viết `ORDER BY`.
+</Callout>
+
+## Quy tắc: cột nào được đứng trong SELECT?
+
+Sau khi gom, mỗi nhóm chỉ còn **một hàng**. Vì vậy mỗi cột trong `SELECT` phải có **một giá trị duy nhất cho cả nhóm**. Chỉ có hai loại cột thỏa điều đó:
+
+- cột nằm trong `GROUP BY`: mọi hàng trong nhóm có cùng giá trị cột này (đó là lý do chúng chung nhóm);
+- hàm tổng hợp: gộp cả nhóm thành một giá trị.
+
+Mọi cột khác đều vi phạm quy tắc. Bài 12 đã gặp một trường hợp: `SELECT name, MAX(price)` không có `GROUP BY`. Thử lại với nhóm:
+
+<Playground>
+```sql
+-- Vi phạm quy tắc: name không nằm trong GROUP BY
+SELECT category,
+       name,
+       COUNT(*) AS so_san_pham
+FROM products
+GROUP BY category;
+```
+</Playground>
+
+SQLite vẫn chạy và trả về 4 hàng. Nhưng hãy nhìn cột `name`: nhóm Dụng cụ có 4 sản phẩm, vậy tên nào được hiện? SQLite chọn **một hàng bất kỳ** trong nhóm, và trên máy này nó hiện "Cà phê phin nhôm", một tên chẳng đại diện cho điều gì. Đổi phiên bản SQLite hay đổi dữ liệu, tên đó có thể khác. PostgreSQL thì từ chối thẳng:
+
+```
+ERROR: column "products.name" must appear in the GROUP BY clause or be used in an aggregate function
+```
+
+Thông báo này nói đúng quy tắc: cột phải nằm trong mệnh đề (clause) `GROUP BY`, hoặc nằm trong một hàm tổng hợp. MySQL 8 ở chế độ mặc định cũng báo lỗi tương tự. Khi viết `GROUP BY`, hãy kiểm tra từng cột trong `SELECT` theo quy tắc này, kể cả khi SQLite không than phiền.
+
+Chiều ngược lại thì không bắt buộc: cột trong `GROUP BY` không nhất thiết phải hiện trong `SELECT`. Nhưng nếu ẩn nó đi, bạn sẽ thấy các con số mà không biết mỗi số thuộc nhóm nào.
+
+## Gom nhóm theo nhiều cột
+
+`GROUP BY` nhận nhiều cột, cách nhau bởi dấu phẩy. Khi đó mỗi nhóm là một **tổ hợp** giá trị khác nhau của các cột, giống `DISTINCT` trên nhiều cột ở bài 9:
+
+<Playground>
+```sql
+SELECT customer_id,
+       status,
+       COUNT(*) AS so_don
+FROM orders
+WHERE customer_id IN (1, 2, 6)
+GROUP BY customer_id, status
+ORDER BY customer_id, status;
+```
+</Playground>
+
+Ba khách 1, 2, 6 có tổng cộng 10 đơn, chia thành 6 nhóm. Chị Hà (khách 1) có 3 đơn `đã giao` và 1 đơn `chờ xác nhận`, nên chiếm 2 hàng. Khách 2 có 2 đơn `đã giao` và 1 đơn `đang giao`. Khách 6 có 2 đơn `đã giao` và 1 đơn `chờ xác nhận`. Một tổ hợp không có đơn nào, ví dụ khách 2 với `đã hủy`, thì **không xuất hiện**: `GROUP BY` chỉ tạo nhóm từ những hàng có thật.
+
+Câu lệnh này cũng cho thấy `WHERE` chạy **trước** `GROUP BY`: các đơn của khách khác bị loại từ đầu, nên không bao giờ được chia vào nhóm nào.
+
+## Gom nhóm theo biểu thức
+
+Nhóm không nhất thiết là một cột có sẵn. Bạn có thể gom theo một biểu thức (expression), ví dụ tháng đặt hàng lấy bằng `STRFTIME` của bài 10:
+
+<Playground>
+```sql
+SELECT STRFTIME('%Y-%m', ordered_on) AS thang,
+       COUNT(*) AS so_don
+FROM orders
+GROUP BY STRFTIME('%Y-%m', ordered_on)
+ORDER BY thang;
+```
+</Playground>
+
+Chín tháng có đơn, từ 2025-03 tới 2025-11. Tháng 11 nhiều đơn nhất với 5 đơn, tháng 10 có 3, tháng 5 và tháng 7 mỗi tháng chỉ có 1. Các tháng khác đều 2 đơn. Biểu thức trong `SELECT` giống hệt biểu thức trong `GROUP BY`, nên cột `thang` có một giá trị duy nhất cho mỗi nhóm và thỏa quy tắc ở phần trên. (Câu này dùng `STRFTIME` nên chỉ chạy trên SQLite; PostgreSQL dùng hàm ngày khác, như bài 10 đã nói.)
+
+Biểu thức `CASE` của bài 11 cũng là một cách gom rất hay dùng: tự định nghĩa nhóm thay vì dùng giá trị có sẵn. Thay vì viết lại cả khối `CASE` trong `GROUP BY`, bạn có thể dùng bí danh của nó:
+
+<Playground>
+```sql
+SELECT CASE
+         WHEN price < 100000 THEN 'rẻ'
+         WHEN price < 200000 THEN 'vừa'
+         ELSE 'đắt'
+       END AS muc_gia,
+       COUNT(*) AS so_san_pham,
+       ROUND(AVG(stock), 1) AS ton_tb
+FROM products
+GROUP BY muc_gia;
+```
+</Playground>
+
+Ba mức giá, mỗi mức 4 sản phẩm, đúng như bài 11 đã thấy. Cột `ton_tb` cho thấy một điều thú vị: hàng rẻ tồn trung bình 82.5 món, hàng vừa 52.5, hàng đắt chỉ 10. Sản phẩm càng đắt, tồn kho trung bình càng ít. Câu lệnh không có `ORDER BY`, nên thứ tự ba nhóm không được đảm bảo: SQLite đang hiện `rẻ`, `vừa`, `đắt`, còn PostgreSQL hiện `vừa`, `rẻ`, `đắt`.
+
+Dùng bí danh trong `GROUP BY` chạy được trên SQLite, PostgreSQL và MySQL, dù theo thứ tự xử lý thì `GROUP BY` diễn ra trước `SELECT`. Đây là một ngoại lệ mà các database này cho phép để đỡ phải viết lại biểu thức dài. Nhưng `WHERE` vẫn không dùng được bí danh trên PostgreSQL, như bài 4 đã nói.
+
+### NULL tạo thành một nhóm
+
+Cột chia nhóm có NULL thì sao? Bài 9 đã thấy `DISTINCT` gộp các NULL thành một. `GROUP BY` cũng vậy:
+
+<Playground>
+```sql
+SELECT referred_by,
+       COUNT(*) AS so_khach
+FROM customers
+GROUP BY referred_by
+ORDER BY referred_by;
+```
+</Playground>
+
+Sáu nhóm. Năm khách tự tìm đến (cột `referred_by` là NULL) được gom chung **một nhóm** với `so_khach` bằng 5. Khách 1 (chị Hà) giới thiệu 3 người. Khách 2, 3, 4, 6 mỗi người giới thiệu 1. Nhóm NULL nằm đầu trên SQLite; trên PostgreSQL nó nằm cuối, đúng như quy tắc NULL khi sắp xếp ở bài 8.
+
+## Bên trong database: thứ tự xử lý
+
+Thêm `GROUP BY`, thứ tự xử lý logic trở thành:
+
+**FROM** → **WHERE** → **GROUP BY** → **SELECT** → **ORDER BY** → **LIMIT**
+
+- `WHERE` lọc **từng hàng** trước khi chia nhóm. Hàng bị loại không thuộc nhóm nào.
+- `GROUP BY` chia các hàng còn lại thành nhóm và gộp mỗi nhóm thành một hàng; hàm tổng hợp được tính ở bước gộp này.
+- `SELECT` chọn các cột hiển thị cho mỗi nhóm và đặt bí danh.
+- `ORDER BY` sắp các hàng **kết quả** (mỗi nhóm một hàng), nên sắp được theo bí danh của hàm tổng hợp.
+- `LIMIT` cắt số **nhóm**, không phải số hàng gốc.
+
+Câu dưới đây đi qua đủ các bước: tính giá trị từng đơn từ `order_items`, rồi lấy 3 đơn có giá trị lớn nhất.
+
+<Playground>
+```sql
+SELECT order_id,
+       COUNT(*) AS so_mon,
+       SUM(quantity * unit_price) AS thanh_tien
+FROM order_items
+GROUP BY order_id
+ORDER BY thanh_tien DESC, order_id
+LIMIT 3;
+```
+</Playground>
+
+`order_items` có 34 hàng, được gom thành 20 nhóm (mỗi đơn một nhóm). `ORDER BY` sắp 20 nhóm theo thành tiền giảm dần, `LIMIT 3` giữ 3 nhóm đầu: đơn 14 (2 sản phẩm, 615000 đồng), đơn 15 (2 sản phẩm, 530000) và đơn 5 (3 sản phẩm, 475000, đúng con số bài 12 đã tính riêng cho đơn này). Thứ tự viết mệnh đề cũng cố định: `SELECT`, `FROM`, `WHERE`, `GROUP BY`, `ORDER BY`, `LIMIT`.
+
+Về cách thực hiện, database thường dùng một trong hai cách để chia nhóm: **sắp xếp** các hàng theo cột nhóm để những hàng cùng giá trị nằm cạnh nhau, hoặc dùng **bảng băm** (hash table) gom các hàng theo giá trị. Cách nào cũng không hứa thứ tự đầu ra, và đó là lý do kết quả nhóm `muc_gia` ở trên có thứ tự khác nhau giữa SQLite và PostgreSQL. Bài 31 về index sẽ cho thấy cách xem database chọn cách nào.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Quên GROUP BY">
+`SELECT category, AVG(price) FROM products` (thiếu `GROUP BY category`) không cho trung bình mỗi danh mục. Trên SQLite, nó trả về **1 hàng**: trung bình của cả bảng (179083.33…) kèm một danh mục bất kỳ, trông như thể đó là trung bình của riêng danh mục ấy. PostgreSQL báo lỗi giống phần quy tắc ở trên. Thấy kết quả chỉ có 1 hàng trong khi bạn chờ nhiều nhóm, hãy kiểm tra `GROUP BY`.
+</Callout>
+
+<Callout type="warn" title="Cột không nằm trong GROUP BY">
+Như phần quy tắc đã cho thấy, SQLite lặng lẽ chọn một giá trị bất kỳ, còn PostgreSQL và MySQL 8 báo lỗi. Nếu bạn cần cột đó, hãy thêm nó vào `GROUP BY` (nhóm sẽ chia nhỏ hơn) hoặc bọc nó trong hàm tổng hợp như `MIN(name)`.
+</Callout>
+
+<Callout type="warn" title="Tưởng nhóm có số 0">
+`GROUP BY customer_id` trên bảng `orders` cho 9 hàng, không phải 12: khách 8, 10, 12 chưa có đơn nào nên không có hàng nào để tạo nhóm, và **không** hiện với số đơn bằng 0. Muốn liệt kê cả khách chưa có đơn, cần nối bảng `customers` với `orders` bằng `LEFT JOIN` ở bài 17.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| Cột không nằm trong `GROUP BY` và không trong hàm tổng hợp | chạy, giá trị bất kỳ | lỗi | lỗi (mặc định MySQL 8) |
+| Bí danh trong `GROUP BY` | có | có | có |
+| Thứ tự nhóm khi không có `ORDER BY` | không đảm bảo | không đảm bảo | không đảm bảo |
+| Nhóm NULL khi `ORDER BY` tăng dần | đầu | cuối | đầu |
+
+PostgreSQL có một nới lỏng hợp lý: nếu bạn gom theo **khóa chính** (primary key) của bảng (ví dụ `GROUP BY id`), các cột khác của bảng đó được phép đứng trong `SELECT`, vì mỗi nhóm chắc chắn chỉ có một hàng. Bài 15 sẽ giải thích khóa chính.
+
+## Tóm tắt
+
+- `GROUP BY cột` chia các hàng thành nhóm theo giá trị của cột, và tạo **một hàng kết quả cho mỗi nhóm**; hàm tổng hợp được tính riêng trong từng nhóm.
+- Mỗi cột trong `SELECT` phải nằm trong `GROUP BY` hoặc nằm trong hàm tổng hợp. SQLite không bắt lỗi mà chọn giá trị bất kỳ; PostgreSQL báo lỗi.
+- Gom được theo nhiều cột (mỗi tổ hợp một nhóm) và theo biểu thức như `STRFTIME` hay `CASE`; bí danh dùng được trong `GROUP BY`.
+- NULL được gom chung một nhóm. Tổ hợp không có hàng nào thì không có nhóm, nên không bao giờ thấy số đếm bằng 0.
+- Thứ tự xử lý: FROM → WHERE → GROUP BY → SELECT → ORDER BY → LIMIT. `GROUP BY` không sắp xếp; cần thứ tự thì viết `ORDER BY`.
+
+## Bài tập
+
+<Exercise hint="Chia khách theo thành phố rồi đếm.">
+Mỗi thành phố có bao nhiêu khách? Kết quả gồm 2 cột theo thứ tự: thành phố, số khách.
+
+```sql
+SELECT city,
+       COUNT(*) AS so_khach
+FROM customers
+GROUP BY city;
+```
+</Exercise>
+
+<Exercise hint="Thông tin bán hàng nằm trong order_items. Mỗi sản phẩm là một nhóm.">
+Với mỗi sản phẩm đã từng được đặt, tính **tổng số lượng** đã đặt trên mọi đơn. Kết quả gồm 2 cột theo thứ tự: mã sản phẩm (`product_id`), tổng số lượng.
+
+```sql
+SELECT product_id,
+       SUM(quantity) AS tong_so_luong
+FROM order_items
+GROUP BY product_id;
+```
+</Exercise>
+
+<Exercise hint="Chạy thử câu có sẵn: kết quả có mấy hàng? Đọc lại phần Lỗi hay gặp." starter={"SELECT category,\n       AVG(price) AS gia_tb\nFROM products;\n"}>
+Câu lệnh có sẵn trong ô muốn tính **giá trung bình của mỗi danh mục**, nhưng chỉ ra 1 hàng. Hãy sửa cho đúng, giữ nguyên 2 cột.
+
+```sql
+SELECT category,
+       AVG(price) AS gia_tb
+FROM products
+GROUP BY category;
+```
+</Exercise>
+
+<Exercise hint="Lọc trạng thái trước khi gom. Nhiều khách hòa nhau về số đơn nên cần tiêu chí phụ.">
+Với mỗi khách, đếm số đơn **đã giao**. Kết quả gồm 2 cột theo thứ tự: `customer_id`, số đơn đã giao; sắp theo **số đơn giảm dần**, cùng số đơn thì theo **`customer_id` tăng dần**.
+
+```sql
+SELECT customer_id,
+       COUNT(*) AS so_don
+FROM orders
+WHERE status = 'đã giao'
+GROUP BY customer_id
+ORDER BY so_don DESC, customer_id;
+```
+</Exercise>
+
+<Exercise hint="Năm đăng ký lấy bằng STRFTIME (bài 10). Gom theo chính biểu thức đó.">
+Mỗi **năm đăng ký** có bao nhiêu khách mới, và trong số đó bao nhiêu khách có số điện thoại? Kết quả gồm 3 cột theo thứ tự: năm (dạng `2024`), số khách, số khách có số điện thoại; sắp theo năm tăng dần.
+
+```sql
+SELECT STRFTIME('%Y', joined_on) AS nam,
+       COUNT(*) AS so_khach,
+       COUNT(phone) AS co_sdt
+FROM customers
+GROUP BY STRFTIME('%Y', joined_on)
+ORDER BY nam;
+```
+</Exercise>
+
+Bây giờ bạn đã biết đếm số đơn của từng khách bằng `GROUP BY customer_id`. Câu hỏi tiếp theo rất tự nhiên: **những khách nào** đặt từ 3 đơn trở lên? Điều kiện (condition) này áp lên kết quả của hàm tổng hợp, nên `WHERE` không làm được. Bài tiếp theo giới thiệu `HAVING`, mệnh đề lọc nhóm sau khi gom.

@@ -1,0 +1,1254 @@
+{
+  "basics/01-database-la-gi#1990fc5b818f": [
+    {
+      "columns": [
+        "id",
+        "name",
+        "category",
+        "price",
+        "stock"
+      ],
+      "rows": 12,
+      "hash": "40a3a43ac5a0"
+    }
+  ],
+  "basics/01-database-la-gi#39655fa66d77": [
+    {
+      "columns": [
+        "id",
+        "customer_id",
+        "ordered_on",
+        "status",
+        "shipped_on"
+      ],
+      "rows": 20,
+      "hash": "da647ede2759"
+    }
+  ],
+  "basics/01-database-la-gi#e7424e046f44": [
+    {
+      "columns": [
+        "id",
+        "name",
+        "city",
+        "email",
+        "phone",
+        "referred_by",
+        "joined_on"
+      ],
+      "rows": 12,
+      "hash": "596c0ae43663"
+    }
+  ],
+  "basics/01-database-la-gi#fddaabccd81f": [
+    {
+      "columns": [
+        "order_id",
+        "product_id",
+        "quantity",
+        "unit_price"
+      ],
+      "rows": 34,
+      "hash": "3248ce3441b7"
+    }
+  ],
+  "basics/02-select#10b95220b855": [
+    {
+      "columns": [
+        "name",
+        "phone"
+      ],
+      "rows": 12,
+      "hash": "584ba47cc029"
+    }
+  ],
+  "basics/02-select#1dc0235f9547": [
+    {
+      "columns": [
+        "city",
+        "name"
+      ],
+      "rows": 12,
+      "hash": "c7c1e44bba96"
+    }
+  ],
+  "basics/02-select#9021f5b44db2": [
+    {
+      "columns": [
+        "name",
+        "price"
+      ],
+      "rows": 12,
+      "hash": "68883c6e948a"
+    },
+    {
+      "columns": [
+        "name",
+        "price"
+      ],
+      "rows": 12,
+      "hash": "68883c6e948a"
+    }
+  ],
+  "basics/02-select#b729566dba06": [
+    {
+      "columns": [
+        "name",
+        "price",
+        "stock"
+      ],
+      "rows": 12,
+      "hash": "6f8396eec8c5"
+    }
+  ],
+  "basics/03-bi-danh-bieu-thuc#07a6afa8e35c": [
+    {
+      "columns": [
+        "ten_san_pham",
+        "gia_ban",
+        "ton_kho"
+      ],
+      "rows": 12,
+      "hash": "6f8396eec8c5"
+    }
+  ],
+  "basics/03-bi-danh-bieu-thuc#351564607bf0": [
+    {
+      "columns": [
+        "nhay_kep",
+        "nhay_don"
+      ],
+      "rows": 12,
+      "hash": "511a571101de"
+    }
+  ],
+  "basics/03-bi-danh-bieu-thuc#62d5d1417642": [
+    {
+      "columns": [
+        "name",
+        "gia_tri_ton_kho",
+        "gia_giam_10"
+      ],
+      "rows": 12,
+      "hash": "cb80d8471e66"
+    }
+  ],
+  "basics/03-bi-danh-bieu-thuc#7baeaafe453c": [
+    {
+      "columns": [
+        "khach_hang",
+        "lien_he"
+      ],
+      "rows": 12,
+      "hash": "a48fbfe2189f"
+    }
+  ],
+  "basics/03-bi-danh-bieu-thuc#9c619695e9a3": [
+    {
+      "columns": [
+        "name",
+        "price",
+        "khong_ngoac",
+        "co_ngoac"
+      ],
+      "rows": 12,
+      "hash": "7afbb991dce0"
+    }
+  ],
+  "basics/03-bi-danh-bieu-thuc#a91017d08a58": [
+    {
+      "columns": [
+        "name",
+        "price",
+        "chia_so_nguyen",
+        "chia_so_thuc"
+      ],
+      "rows": 12,
+      "hash": "d84f8f3f6815"
+    }
+  ],
+  "basics/03-bi-danh-bieu-thuc#ead305c29f21": [
+    {
+      "columns": [
+        "order_id",
+        "product_id",
+        "thanh_tien"
+      ],
+      "rows": 34,
+      "hash": "de1fa8c70ebf"
+    }
+  ],
+  "basics/03-bi-danh-bieu-thuc#f256e71ae1ba": [
+    {
+      "columns": [
+        "order_id",
+        "product_id",
+        "quantity",
+        "unit_price",
+        "quantity * unit_price"
+      ],
+      "rows": 34,
+      "hash": "ed30d7a49641"
+    }
+  ],
+  "basics/04-where#24fa3bdd1f0a": [
+    {
+      "columns": [
+        "name",
+        "joined_on"
+      ],
+      "rows": 1,
+      "hash": "96b8bd56f1eb"
+    }
+  ],
+  "basics/04-where#4a179f4f77c2": [
+    {
+      "columns": [
+        "name",
+        "joined_on"
+      ],
+      "rows": 7,
+      "hash": "dc0d52652f90"
+    }
+  ],
+  "basics/04-where#55ba2f9043a2": [
+    {
+      "columns": [
+        "order_id",
+        "product_id",
+        "thanh_tien"
+      ],
+      "rows": 9,
+      "hash": "cd8f50d3399e"
+    }
+  ],
+  "basics/04-where#683db5f180eb": [
+    {
+      "columns": [
+        "name",
+        "city"
+      ],
+      "rows": 0,
+      "hash": "97d170e1550e"
+    }
+  ],
+  "basics/04-where#72b3784fc828": [
+    {
+      "columns": [
+        "name",
+        "price"
+      ],
+      "rows": 5,
+      "hash": "468275bb15f9"
+    },
+    {
+      "columns": [
+        "name",
+        "price"
+      ],
+      "rows": 6,
+      "hash": "e23002ce0ecf"
+    }
+  ],
+  "basics/04-where#79b1aa72b3dd": [
+    {
+      "columns": [
+        "name",
+        "city"
+      ],
+      "rows": 4,
+      "hash": "03d36cbe80f2"
+    }
+  ],
+  "basics/04-where#8e15ea535d1d": [
+    {
+      "columns": [
+        "order_id",
+        "thanh_tien"
+      ],
+      "rows": 3,
+      "hash": "fe6fb9baf905"
+    }
+  ],
+  "basics/04-where#f6580a816046": [
+    {
+      "columns": [
+        "id",
+        "ordered_on",
+        "status"
+      ],
+      "rows": 8,
+      "hash": "a1a962818e2c"
+    }
+  ],
+  "basics/05-and-or-not#0d2fa846991e": [
+    {
+      "columns": [
+        "name",
+        "city",
+        "joined_on"
+      ],
+      "rows": 4,
+      "hash": "eea6e410ed3e"
+    }
+  ],
+  "basics/05-and-or-not#11ee07a8682b": [
+    {
+      "columns": [
+        "name",
+        "category"
+      ],
+      "rows": 6,
+      "hash": "4b80eef0f070"
+    }
+  ],
+  "basics/05-and-or-not#1de6cc852106": [
+    {
+      "columns": [
+        "name",
+        "city"
+      ],
+      "rows": 4,
+      "hash": "03d36cbe80f2"
+    }
+  ],
+  "basics/05-and-or-not#3090072f5b62": [
+    {
+      "columns": [
+        "name",
+        "category",
+        "price"
+      ],
+      "rows": 2,
+      "hash": "4be783395567"
+    }
+  ],
+  "basics/05-and-or-not#4a1800da76ae": [
+    {
+      "columns": [
+        "name",
+        "city"
+      ],
+      "rows": 5,
+      "hash": "7bb800dbb6c6"
+    }
+  ],
+  "basics/05-and-or-not#5dff2ff60fe7": [
+    {
+      "columns": [
+        "name",
+        "category",
+        "price"
+      ],
+      "rows": 3,
+      "hash": "5865f5a7dc27"
+    }
+  ],
+  "basics/05-and-or-not#ab946405758a": [
+    {
+      "columns": [
+        "name",
+        "category",
+        "price"
+      ],
+      "rows": 5,
+      "hash": "1117c7347eb6"
+    }
+  ],
+  "basics/06-in-between-like#2e271fbc72a3": [
+    {
+      "columns": [
+        "name",
+        "city"
+      ],
+      "rows": 6,
+      "hash": "84d83c647f09"
+    }
+  ],
+  "basics/06-in-between-like#3c8045cf39c1": [
+    {
+      "columns": [
+        "id",
+        "thoi_diem"
+      ],
+      "rows": 1,
+      "hash": "3d4737bb81ea"
+    }
+  ],
+  "basics/06-in-between-like#683adb447152": [
+    {
+      "columns": [
+        "name",
+        "city"
+      ],
+      "rows": 5,
+      "hash": "b2e58a7b86f9"
+    }
+  ],
+  "basics/06-in-between-like#7ae29b796d56": [
+    {
+      "columns": [
+        "name"
+      ],
+      "rows": 3,
+      "hash": "1277878e5b8e"
+    },
+    {
+      "columns": [
+        "name"
+      ],
+      "rows": 3,
+      "hash": "08a52bdea1d4"
+    },
+    {
+      "columns": [
+        "name"
+      ],
+      "rows": 8,
+      "hash": "e9ec8a62fa3d"
+    }
+  ],
+  "basics/06-in-between-like#7c9ceb78d5b0": [
+    {
+      "columns": [
+        "name",
+        "price"
+      ],
+      "rows": 4,
+      "hash": "8af395790be9"
+    }
+  ],
+  "basics/06-in-between-like#8b88dd1d9e57": [
+    {
+      "columns": [
+        "name"
+      ],
+      "rows": 4,
+      "hash": "b89777585cf5"
+    },
+    {
+      "columns": [
+        "name"
+      ],
+      "rows": 0,
+      "hash": "97d170e1550e"
+    }
+  ],
+  "basics/06-in-between-like#c0a9c882769c": [
+    {
+      "columns": [
+        "id",
+        "ordered_on"
+      ],
+      "rows": 2,
+      "hash": "e9f341afe395"
+    }
+  ],
+  "basics/06-in-between-like#d52c433e41f4": [
+    {
+      "columns": [
+        "name",
+        "category",
+        "price"
+      ],
+      "rows": 3,
+      "hash": "b157610d2fac"
+    }
+  ],
+  "basics/07-null#05eca9220318": [
+    {
+      "columns": [
+        "name",
+        "goi_dien",
+        "lien_he"
+      ],
+      "rows": 12,
+      "hash": "cf3b6e723144"
+    }
+  ],
+  "basics/07-null#08ba883b85b3": [
+    {
+      "columns": [
+        "id",
+        "status",
+        "shipped_on"
+      ],
+      "rows": 15,
+      "hash": "668c3b23b907"
+    }
+  ],
+  "basics/07-null#3cda5400e3a8": [
+    {
+      "columns": [
+        "name",
+        "phone"
+      ],
+      "rows": 0,
+      "hash": "97d170e1550e"
+    }
+  ],
+  "basics/07-null#40801d77e95b": [
+    {
+      "columns": [
+        "bang_null",
+        "null_bang_null",
+        "dung_and",
+        "sai_and",
+        "dung_or",
+        "sai_or",
+        "phu_dinh_null",
+        "cong_null"
+      ],
+      "rows": 1,
+      "hash": "e0b607f752a9"
+    }
+  ],
+  "basics/07-null#61767fce5e09": [
+    {
+      "columns": [
+        "name",
+        "phone"
+      ],
+      "rows": 0,
+      "hash": "97d170e1550e"
+    }
+  ],
+  "basics/07-null#64146a754beb": [
+    {
+      "columns": [
+        "name",
+        "phone"
+      ],
+      "rows": 5,
+      "hash": "2de011414993"
+    }
+  ],
+  "basics/07-null#99b24af12dcc": [
+    {
+      "columns": [
+        "name",
+        "phone"
+      ],
+      "rows": 11,
+      "hash": "013263ca94f1"
+    }
+  ],
+  "basics/08-order-by#3f3993ab34cb": [
+    {
+      "columns": [
+        "city",
+        "name",
+        "joined_on"
+      ],
+      "rows": 12,
+      "hash": "cddc200a2cf6"
+    }
+  ],
+  "basics/08-order-by#42dfd6564440": [
+    {
+      "columns": [
+        "name",
+        "phone"
+      ],
+      "rows": 12,
+      "hash": "715391e08589"
+    }
+  ],
+  "basics/08-order-by#76edf7ee13af": [
+    {
+      "columns": [
+        "name",
+        "phone"
+      ],
+      "rows": 12,
+      "hash": "cd64528242e7"
+    }
+  ],
+  "basics/08-order-by#813720bc416a": [
+    {
+      "columns": [
+        "name",
+        "phone"
+      ],
+      "rows": 12,
+      "hash": "e0c75fef47ce"
+    }
+  ],
+  "basics/08-order-by#920b73515abe": [
+    {
+      "columns": [
+        "name",
+        "gia_tri_ton_kho"
+      ],
+      "rows": 12,
+      "hash": "26de8684afd6"
+    }
+  ],
+  "basics/08-order-by#a7c52d1c90b3": [
+    {
+      "columns": [
+        "name",
+        "price"
+      ],
+      "rows": 12,
+      "hash": "a1268fd58ccc"
+    }
+  ],
+  "basics/08-order-by#e7b023dae4bd": [
+    {
+      "columns": [
+        "name",
+        "price"
+      ],
+      "rows": 12,
+      "hash": "02a42d0be630"
+    }
+  ],
+  "basics/08-order-by#ea901b3dd8f7": [
+    {
+      "columns": [
+        "id",
+        "ordered_on",
+        "status"
+      ],
+      "rows": 12,
+      "hash": "e01ba72e78ef"
+    }
+  ],
+  "basics/09-limit-distinct#0cb871f5a77d": [
+    {
+      "columns": [
+        "name",
+        "stock"
+      ],
+      "rows": 1,
+      "hash": "e282b66151e5"
+    }
+  ],
+  "basics/09-limit-distinct#1eb84d1caf39": [
+    {
+      "columns": [
+        "name",
+        "price"
+      ],
+      "rows": 3,
+      "hash": "a72435d7c253"
+    }
+  ],
+  "basics/09-limit-distinct#b652d485ea5f": [
+    {
+      "columns": [
+        "referred_by"
+      ],
+      "rows": 6,
+      "hash": "3ea49b644db1"
+    }
+  ],
+  "basics/09-limit-distinct#bbaabbb06f28": [
+    {
+      "columns": [
+        "city"
+      ],
+      "rows": 6,
+      "hash": "4387a2c9e08b"
+    }
+  ],
+  "basics/09-limit-distinct#c7e85e04b956": [
+    {
+      "columns": [
+        "id",
+        "ordered_on"
+      ],
+      "rows": 5,
+      "hash": "6459519738ac"
+    },
+    {
+      "columns": [
+        "id",
+        "ordered_on"
+      ],
+      "rows": 5,
+      "hash": "6459426b0f92"
+    }
+  ],
+  "basics/09-limit-distinct#ceaf34f2749c": [
+    {
+      "columns": [
+        "product_id",
+        "unit_price"
+      ],
+      "rows": 3,
+      "hash": "6bd494e29556"
+    }
+  ],
+  "basics/10-ham-xu-ly#2a2248ec6fa0": [
+    {
+      "columns": [
+        "name",
+        "do_dai"
+      ],
+      "rows": 12,
+      "hash": "0209dc33233a"
+    }
+  ],
+  "basics/10-ham-xu-ly#4cea1452b9bf": [
+    {
+      "columns": [
+        "id",
+        "ordered_on",
+        "nam",
+        "thang"
+      ],
+      "rows": 5,
+      "hash": "4bea1fad5fcb"
+    }
+  ],
+  "basics/10-ham-xu-ly#545262c9df23": [
+    {
+      "columns": [
+        "id",
+        "ordered_on"
+      ],
+      "rows": 0,
+      "hash": "97d170e1550e"
+    },
+    {
+      "columns": [
+        "id",
+        "ordered_on"
+      ],
+      "rows": 3,
+      "hash": "73c9e0d2e8fc"
+    }
+  ],
+  "basics/10-ham-xu-ly#601c5ab88ec8": [
+    {
+      "columns": [
+        "id",
+        "status",
+        "ngay_gui"
+      ],
+      "rows": 4,
+      "hash": "20cc026e5811"
+    },
+    {
+      "columns": [
+        "name",
+        "chia_so_nguyen",
+        "chia_so_thuc"
+      ],
+      "rows": 4,
+      "hash": "b6523467877b"
+    }
+  ],
+  "basics/10-ham-xu-ly#6cc47e184c75": [
+    {
+      "columns": [
+        "city",
+        "viet_hoa",
+        "viet_thuong"
+      ],
+      "rows": 3,
+      "hash": "fdeb53541aeb"
+    }
+  ],
+  "basics/10-ham-xu-ly#835753e2f67b": [
+    {
+      "columns": [
+        "name",
+        "ten_moi"
+      ],
+      "rows": 2,
+      "hash": "9ac152169950"
+    },
+    {
+      "columns": [
+        "truoc_khi_cat",
+        "sau_khi_cat"
+      ],
+      "rows": 1,
+      "hash": "d354c8db39c3"
+    }
+  ],
+  "basics/10-ham-xu-ly#a914c56d1408": [
+    {
+      "columns": [
+        "name",
+        "price",
+        "chua_lam_tron",
+        "gia_gom_vat"
+      ],
+      "rows": 12,
+      "hash": "acdb54e51808"
+    },
+    {
+      "columns": [
+        "name",
+        "stock",
+        "lech_so_voi_50"
+      ],
+      "rows": 12,
+      "hash": "0253f44f6fd8"
+    }
+  ],
+  "basics/10-ham-xu-ly#b25cb6422bf4": [
+    {
+      "columns": [
+        "name",
+        "phone",
+        "dau_so"
+      ],
+      "rows": 7,
+      "hash": "141d91699679"
+    }
+  ],
+  "basics/11-case#0b988a273ee6": [
+    {
+      "columns": [
+        "name",
+        "lien_he"
+      ],
+      "rows": 4,
+      "hash": "8b919fc6947f"
+    }
+  ],
+  "basics/11-case#34ce199b1eb7": [
+    {
+      "columns": [
+        "name",
+        "ton_kho"
+      ],
+      "rows": 4,
+      "hash": "308e79292751"
+    }
+  ],
+  "basics/11-case#3fc5d6ecac6f": [
+    {
+      "columns": [
+        "id",
+        "status",
+        "shipped_on"
+      ],
+      "rows": 6,
+      "hash": "5b8cc193a517"
+    }
+  ],
+  "basics/11-case#510c17245d10": [
+    {
+      "columns": [
+        "name",
+        "stock",
+        "canh_bao"
+      ],
+      "rows": 12,
+      "hash": "3f02861be420"
+    }
+  ],
+  "basics/11-case#57b84c0abe15": [
+    {
+      "columns": [
+        "name",
+        "lien_he"
+      ],
+      "rows": 7,
+      "hash": "9f80825a8947"
+    }
+  ],
+  "basics/11-case#7a3868fbc401": [
+    {
+      "columns": [
+        "name",
+        "city"
+      ],
+      "rows": 12,
+      "hash": "970877760a4e"
+    }
+  ],
+  "basics/11-case#8a120375e2d2": [
+    {
+      "columns": [
+        "name",
+        "price",
+        "muc_gia"
+      ],
+      "rows": 12,
+      "hash": "be21bbb98e61"
+    }
+  ],
+  "basics/11-case#ce9c48886dfe": [
+    {
+      "columns": [
+        "id",
+        "status",
+        "nhom"
+      ],
+      "rows": 6,
+      "hash": "48cba0687b23"
+    }
+  ],
+  "basics/11-case#d5d9bcc22dc5": [
+    {
+      "columns": [
+        "name",
+        "price",
+        "muc_gia"
+      ],
+      "rows": 12,
+      "hash": "ef585ef39c9e"
+    }
+  ],
+  "basics/12-ham-tong-hop#14c7575a4e19": [
+    {
+      "columns": [
+        "so_mon",
+        "so_luong",
+        "thanh_tien"
+      ],
+      "rows": 1,
+      "hash": "e548bbd86a12"
+    }
+  ],
+  "basics/12-ham-tong-hop#362b503279dc": [
+    {
+      "columns": [
+        "so_san_pham",
+        "tong_ton",
+        "dat_nhat",
+        "tong_ton_mac_dinh"
+      ],
+      "rows": 1,
+      "hash": "83b4a4ee1df2"
+    }
+  ],
+  "basics/12-ham-tong-hop#60de434e1bda": [
+    {
+      "columns": [
+        "so_khach",
+        "co_sdt",
+        "co_email",
+        "so_thanh_pho",
+        "duoc_gioi_thieu",
+        "so_nguoi_gioi_thieu"
+      ],
+      "rows": 1,
+      "hash": "833d089b9734"
+    }
+  ],
+  "basics/12-ham-tong-hop#7722ce80e95f": [
+    {
+      "columns": [
+        "so_khach"
+      ],
+      "rows": 1,
+      "hash": "91ef02100e01"
+    }
+  ],
+  "basics/12-ham-tong-hop#8dc4549587b1": [
+    {
+      "columns": [
+        "so_don",
+        "don_dau_tien",
+        "don_gan_nhat"
+      ],
+      "rows": 1,
+      "hash": "c58207bd0d16"
+    }
+  ],
+  "basics/12-ham-tong-hop#b90a9e1c5d75": [
+    {
+      "columns": [
+        "tat_ca",
+        "con_hang",
+        "tb_bo_qua_null",
+        "tb_tinh_la_0"
+      ],
+      "rows": 1,
+      "hash": "1633a706602d"
+    }
+  ],
+  "basics/12-ham-tong-hop#c20d46f9dd33": [
+    {
+      "columns": [
+        "tong_ton",
+        "re_nhat",
+        "dat_nhat",
+        "gia_tb",
+        "gia_tb_tron"
+      ],
+      "rows": 1,
+      "hash": "7bffc71990b0"
+    }
+  ],
+  "basics/12-ham-tong-hop#ed182ae771f7": [
+    {
+      "columns": [
+        "dang_ky_som_nhat",
+        "dang_ky_muon_nhat",
+        "ten_dau",
+        "ten_cuoi"
+      ],
+      "rows": 1,
+      "hash": "95d83f53c1f7"
+    }
+  ],
+  "basics/13-group-by#3326e2fc717b": [
+    {
+      "columns": [
+        "referred_by",
+        "so_khach"
+      ],
+      "rows": 6,
+      "hash": "d815fcd786a9"
+    }
+  ],
+  "basics/13-group-by#4a9a1a0f715c": [
+    {
+      "columns": [
+        "category",
+        "name",
+        "so_san_pham"
+      ],
+      "rows": 4,
+      "hash": "6154bd7698e1"
+    }
+  ],
+  "basics/13-group-by#506f933f0e6d": [
+    {
+      "columns": [
+        "category",
+        "so_san_pham",
+        "re_nhat",
+        "dat_nhat",
+        "ton_kho"
+      ],
+      "rows": 4,
+      "hash": "e51c683d6a21"
+    }
+  ],
+  "basics/13-group-by#653914f671d6": [
+    {
+      "columns": [
+        "order_id",
+        "so_mon",
+        "thanh_tien"
+      ],
+      "rows": 3,
+      "hash": "bffaa2e58ab6"
+    }
+  ],
+  "basics/13-group-by#679a6780f54c": [
+    {
+      "columns": [
+        "customer_id",
+        "status",
+        "so_don"
+      ],
+      "rows": 6,
+      "hash": "06359f53a710"
+    }
+  ],
+  "basics/13-group-by#72cf815aeeef": [
+    {
+      "columns": [
+        "thang",
+        "so_don"
+      ],
+      "rows": 9,
+      "hash": "f99de3217b70"
+    }
+  ],
+  "basics/13-group-by#7f1f71c9778c": [
+    {
+      "columns": [
+        "muc_gia",
+        "so_san_pham",
+        "ton_tb"
+      ],
+      "rows": 3,
+      "hash": "0d7a7e6f8d85"
+    }
+  ],
+  "basics/13-group-by#8d6e53345945": [
+    {
+      "columns": [
+        "status",
+        "so_don"
+      ],
+      "rows": 4,
+      "hash": "367e00d2ac35"
+    }
+  ],
+  "basics/14-having#240a395125d4": [
+    {
+      "columns": [
+        "customer_id",
+        "so_don"
+      ],
+      "rows": 1,
+      "hash": "289bc1df476f"
+    }
+  ],
+  "basics/14-having#79fd41acd87b": [
+    {
+      "columns": [
+        "city",
+        "so_khach",
+        "co_sdt"
+      ],
+      "rows": 5,
+      "hash": "480267108c46"
+    }
+  ],
+  "basics/14-having#82bf1e70375f": [
+    {
+      "columns": [
+        "so_san_pham"
+      ],
+      "rows": 0,
+      "hash": "97d170e1550e"
+    }
+  ],
+  "basics/14-having#98e27b603da6": [
+    {
+      "columns": [
+        "thang",
+        "so_don"
+      ],
+      "rows": 7,
+      "hash": "cbad5a51b7e5"
+    },
+    {
+      "columns": [
+        "thang",
+        "so_don"
+      ],
+      "rows": 5,
+      "hash": "6d4900b6577b"
+    }
+  ],
+  "basics/14-having#99e9c3ef1614": [
+    {
+      "columns": [
+        "category",
+        "so_con_hang",
+        "ton_kho"
+      ],
+      "rows": 3,
+      "hash": "38000f0877cd"
+    }
+  ],
+  "basics/14-having#d726ccc8e5c7": [
+    {
+      "columns": [
+        "customer_id",
+        "so_don"
+      ],
+      "rows": 3,
+      "hash": "493527295db2"
+    }
+  ],
+  "basics/15-khoa-va-quan-he#4b18b20f2766": [
+    {
+      "columns": [
+        "order_id",
+        "product_id",
+        "quantity",
+        "unit_price"
+      ],
+      "rows": 7,
+      "hash": "a22b825db76e"
+    }
+  ],
+  "basics/15-khoa-va-quan-he#50331d537c98": [
+    {
+      "columns": [
+        "so_hang",
+        "so_don",
+        "so_san_pham"
+      ],
+      "rows": 1,
+      "hash": "ad566b067fad"
+    }
+  ],
+  "basics/15-khoa-va-quan-he#65c64031dc99": [
+    {
+      "columns": [
+        "so_hang",
+        "so_id",
+        "so_ten",
+        "so_thanh_pho"
+      ],
+      "rows": 1,
+      "hash": "74ac028a3bdd"
+    }
+  ],
+  "basics/15-khoa-va-quan-he#80e018bb2c2a": [
+    {
+      "columns": [
+        "id",
+        "customer_id",
+        "ordered_on",
+        "status"
+      ],
+      "rows": 1,
+      "hash": "5b7e3a4eea72"
+    },
+    {
+      "columns": [
+        "id",
+        "name",
+        "city"
+      ],
+      "rows": 1,
+      "hash": "fde6ec375a41"
+    }
+  ],
+  "basics/15-khoa-va-quan-he#9bdc9b94b323": [
+    {
+      "columns": [
+        "id",
+        "ordered_on",
+        "status"
+      ],
+      "rows": 2,
+      "hash": "fb750787e495"
+    }
+  ],
+  "mysql/01-gioi-thieu#fa1c148de93c": [
+    {
+      "columns": [
+        "category",
+        "so_san_pham"
+      ],
+      "rows": 4,
+      "hash": "5d8c8c56244e"
+    }
+  ],
+  "postgres/01-gioi-thieu#285313331a98": [
+    {
+      "columns": [
+        "name",
+        "joined_on",
+        "so_ngay_tham_gia"
+      ],
+      "rows": 12
+    }
+  ],
+  "postgres/01-gioi-thieu#5b582ae38689": [
+    {
+      "columns": [
+        "san_pham"
+      ],
+      "rows": 3,
+      "hash": "c4ce4d76dcb3"
+    }
+  ],
+  "postgres/01-gioi-thieu#ce2ba3e1b733": [
+    {
+      "columns": [
+        "version"
+      ],
+      "rows": 1
+    }
+  ]
+}

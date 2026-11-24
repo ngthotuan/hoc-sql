@@ -1,0 +1,36 @@
+{
+  "name": "hoc-sql",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "check:contrast": "node scripts/check-contrast.mjs",
+    "validate": "node scripts/validate-lessons.mjs"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "^8.1.6",
+    "@astrojs/preact": "^6.1.6",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-sql": "^6.10.0",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
+    "@electric-sql/pglite": "^0.5.17",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource/be-vietnam-pro": "^5.3.0",
+    "@lezer/highlight": "^1.2.5",
+    "astro": "^7.4.13",
+    "codemirror": "^6.0.2",
+    "preact": "^11.2.0",
+    "sql.js": "^1.17.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@types/sql.js": "^1.16.0",
+    "typescript": "^6.0.3"
+  }
+}

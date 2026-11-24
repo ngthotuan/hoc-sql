@@ -1,0 +1,251 @@
+---
+title: Sắp xếp với ORDER BY
+description: Sắp xếp kết quả tăng hoặc giảm dần, theo nhiều cột và theo biểu thức, xử lý các hàng hòa nhau và NULL, và hiểu vì sao chữ tiếng Việt có dấu bị sắp xếp "lạ".
+order: 8
+---
+
+Chủ cửa hàng muốn in bảng giá từ rẻ tới đắt, và danh sách khách gom theo từng thành phố. Cả hai đều cần sắp xếp kết quả. Từ bài 1, bạn đã được dặn: nếu không yêu cầu sắp xếp, database được phép trả các hàng (row) theo bất kỳ thứ tự nào. Ở bài 2, khi xem danh sách khách theo thành phố, các khách Hà Nội nằm rải rác giữa những thành phố khác, và bài đó hẹn rằng muốn chúng đứng cạnh nhau thì cần sắp xếp. Bài 7 thì để lại câu hỏi: khi sắp xếp, NULL nên đứng đầu hay cuối?
+
+Bài này giới thiệu mệnh đề (clause) `ORDER BY` để trả lời cả ba. Sắp xếp nghe đơn giản, nhưng có ba chỗ dễ sai: các hàng hòa nhau, NULL, và chữ tiếng Việt có dấu.
+
+## Sắp xếp tăng dần và giảm dần
+
+Trong câu truy vấn (query), `ORDER BY` đứng sau `WHERE`, ở cuối những mệnh đề bạn đã học. Theo sau nó là cột (column) dùng để sắp xếp:
+
+<Playground>
+```sql
+SELECT name, price
+FROM products
+ORDER BY price;
+```
+</Playground>
+
+Kết quả (result set) có 12 sản phẩm, xếp từ rẻ nhất tới đắt nhất: phin nhôm (45000) đứng đầu, bánh đậu xanh (55000) thứ hai, và máy xay cà phê (450000) đứng cuối. Lần đầu tiên trong khóa học, bạn có thể nói "hàng đầu tiên" mà chắc chắn đúng, vì thứ tự giờ đã được quy định.
+
+Mặc định, `ORDER BY` sắp **tăng dần** (từ nhỏ tới lớn). Bạn có thể viết rõ ra bằng từ khóa (keyword) `ASC` (ascending, tăng dần), hoặc đảo ngược bằng `DESC` (descending, giảm dần):
+
+<Playground>
+```sql
+SELECT name, price
+FROM products
+ORDER BY price DESC;
+```
+</Playground>
+
+Giờ máy xay cà phê (450000) đứng đầu, rồi tới trà sen Tây Hồ (390000) và trà shan tuyết (260000); phin nhôm đứng cuối. `ORDER BY price` và `ORDER BY price ASC` cho kết quả giống hệt nhau; khóa học chỉ viết `ASC` khi muốn nhấn mạnh.
+
+Với ngày tháng, "tăng dần" nghĩa là **cũ trước, mới sau**. Muốn xem đơn mới nhất trước, bạn dùng `DESC`. Với chữ, tăng dần là theo thứ tự chữ cái, nhưng chữ có dấu có một cái bẫy mà bạn sẽ gặp ở phần sau.
+
+## ORDER BY đi cùng WHERE
+
+Khi câu lệnh (statement) có cả `WHERE` và `ORDER BY`, `WHERE` đứng trước. Ví dụ, các đơn đã giao, mới nhất trước:
+
+<Playground>
+```sql
+SELECT id,
+       ordered_on,
+       status
+FROM orders
+WHERE status = 'đã giao'
+ORDER BY ordered_on DESC;
+```
+</Playground>
+
+Kết quả có 12 đơn đã giao. Đơn 14 (đặt ngày 2025-10-18) đứng đầu vì mới nhất, đơn 1 (2025-03-02) đứng cuối vì cũ nhất. `WHERE` lọc trước, chỉ còn 12 hàng; `ORDER BY` chỉ sắp xếp 12 hàng đó.
+
+Bài 4 đã giới thiệu thứ tự xử lý logic FROM → WHERE → SELECT. `ORDER BY` được xử lý sau `SELECT`:
+
+1. **FROM**: lấy dữ liệu từ bảng (table).
+2. **WHERE**: bỏ những hàng không thỏa điều kiện (condition).
+3. **SELECT**: tính biểu thức (expression), chọn cột, đặt bí danh (alias).
+4. **ORDER BY**: sắp xếp các hàng.
+
+Có một chi tiết cần nói rõ: ở bước 3, các cột không được chọn **chưa bị vứt đi ngay**. Database vẫn giữ chúng bên cạnh mỗi hàng cho tới khi sắp xếp xong, và chỉ bỏ chúng khỏi kết quả lúc trả về cho bạn. Vì vậy, ở bước `ORDER BY`, database nhìn thấy cả bí danh vừa đặt lẫn mọi cột gốc của hàng.
+
+Thứ tự này có một hệ quả quan trọng, bạn sẽ thấy ngay ở phần tiếp theo.
+
+## Sắp xếp theo biểu thức và bí danh
+
+Vì `ORDER BY` chạy **sau** `SELECT`, nó dùng được bí danh đặt trong `SELECT`. Đây là điểm khác với `WHERE` ở bài 4: theo chuẩn SQL, `WHERE` chạy trước `SELECT` nên không thấy bí danh (SQLite là ngoại lệ, như bài 4 đã nói), còn `ORDER BY` thì thấy. SQLite, PostgreSQL và MySQL đều cho dùng bí danh trong `ORDER BY`. Riêng PostgreSQL, bí danh phải **đứng một mình**: `ORDER BY gia_tri_ton_kho` chạy được, nhưng `ORDER BY gia_tri_ton_kho * 2` báo lỗi `column "gia_tri_ton_kho" does not exist`.
+
+<Playground>
+```sql
+SELECT name,
+       stock * price AS gia_tri_ton_kho
+FROM products
+ORDER BY gia_tri_ton_kho DESC;
+```
+</Playground>
+
+Robusta (9600000 đồng) đứng đầu, rồi tới bánh đậu xanh (8250000) và cà phê Culi (7250000). Bình giữ nhiệt và bánh pía (giá trị 0, đã hết hàng) nằm cuối. Không cần viết lại biểu thức `stock * price` trong `ORDER BY`.
+
+`ORDER BY` cũng sắp xếp được theo cột **không có** trong `SELECT`. Ví dụ `SELECT name FROM products ORDER BY price;` liệt kê tên từ rẻ tới đắt mà không hiện cột giá. Cách này hợp lệ, nhưng người đọc kết quả sẽ không biết vì sao các hàng xếp như vậy, nên thường bạn nên hiện cả cột dùng để sắp xếp.
+
+## Sắp xếp theo nhiều cột
+
+Đây là lời giải cho bài 2: sắp xếp khách theo thành phố để các khách cùng thành phố đứng cạnh nhau. Nhưng trong cùng một thành phố, khách nên xếp thế nào? Bạn có thể thêm cột thứ hai, cách nhau bởi dấu phẩy:
+
+<Playground>
+```sql
+SELECT city,
+       name,
+       joined_on
+FROM customers
+ORDER BY city, joined_on DESC;
+```
+</Playground>
+
+Database sắp theo `city` trước. Chỉ khi hai hàng có **cùng** thành phố, nó mới dùng tới cột thứ hai, `joined_on DESC`, để quyết định hàng nào đứng trước. Trong nhóm Hà Nội, Dương Hải Yến (đăng ký 2025-10-02) đứng đầu, chị Nguyễn Thu Hà (2024-02-11) đứng cuối. Mỗi cột có `ASC` hoặc `DESC` riêng: ở đây thành phố tăng dần, còn ngày đăng ký giảm dần.
+
+Hãy để ý thứ tự các thành phố trong kết quả: Cần Thơ, **Huế**, **Hà Nội**, Hải Phòng, TP.HCM, **Đà Nẵng**. Huế đứng trước Hà Nội, và Đà Nẵng đứng cuối cùng, sau cả TP.HCM. Đây không phải lỗi gõ; lý do nằm ở phần "Chữ tiếng Việt có dấu" bên dưới.
+
+### Các hàng hòa nhau
+
+Nếu chỉ viết `ORDER BY city`, bốn khách Hà Nội có cùng giá trị sắp xếp: chúng **hòa nhau**. Database chỉ đảm bảo bốn hàng đó đứng cạnh nhau, chứ **không đảm bảo** thứ tự giữa chúng. Bạn đã gặp một ví dụ thật ở ô giá trị tồn kho phía trên: phin nhôm và máy xay cùng có giá trị 5400000, bình giữ nhiệt và bánh pía cùng bằng 0. SQLite trả về phin nhôm trước máy xay, còn PostgreSQL trả về máy xay trước, với cùng câu lệnh và cùng dữ liệu. Muốn thứ tự luôn ổn định, hãy thêm một cột phụ để phá thế hòa, như `joined_on` ở trên, hoặc `name`.
+
+## NULL đứng đầu hay cuối?
+
+Khi cột dùng để sắp xếp có NULL, NULL phải được đặt ở đâu đó. Nhưng NULL là "không biết", nên không có cách nào "đúng" để so nó với các giá trị khác. Mỗi database tự chọn một quy ước:
+
+<Playground>
+```sql
+SELECT name, phone
+FROM customers
+ORDER BY phone;
+```
+</Playground>
+
+Trên SQLite, 5 khách có `phone` là NULL **đứng đầu**, sau đó mới tới các số điện thoại từ nhỏ tới lớn (Lý Kim Chi với số 0901222333 đứng đầu nhóm có số). SQLite coi NULL nhỏ hơn mọi giá trị. PostgreSQL thì ngược lại: khi sắp tăng dần, NULL **đứng cuối**.
+
+Nếu muốn kết quả giống nhau trên SQLite và PostgreSQL, hãy nói rõ vị trí của NULL bằng `NULLS FIRST` (NULL đứng đầu) hoặc `NULLS LAST` (NULL đứng cuối):
+
+<Playground>
+```sql
+SELECT name, phone
+FROM customers
+ORDER BY phone NULLS LAST, name;
+```
+</Playground>
+
+Giờ 7 khách có số điện thoại đứng trước, theo số tăng dần, và 5 khách không có số đứng cuối. Cột thứ hai `name` phá thế hòa giữa 5 khách cùng NULL: Bùi Anh Tuấn, Ngô Đức Thịnh, Trần Minh Khoa, Trịnh Quang Vinh, Võ Thanh Tâm.
+
+Ngược lại, khi sắp **giảm dần**, SQLite đưa NULL xuống cuối. Ví dụ dưới đây chỉ để minh họa cơ chế: sắp số điện thoại giảm dần, nhưng vẫn đưa khách **thiếu số** lên đầu bằng `NULLS FIRST` (bạn sẽ gặp tình huống thực tế hơn ở bài tập cuối):
+
+<Playground>
+```sql
+SELECT name, phone
+FROM customers
+ORDER BY phone DESC NULLS FIRST, name;
+```
+</Playground>
+
+5 khách thiếu số đứng đầu (theo tên, từ Bùi Anh Tuấn tới Võ Thanh Tâm), sau đó là các số từ lớn tới nhỏ: Đặng Gia Linh (0987654321) đứng đầu nhóm có số, Lý Kim Chi (0901222333) đứng cuối.
+
+MySQL không hỗ trợ `NULLS FIRST` / `NULLS LAST` (MySQL xếp NULL đầu tiên khi sắp tăng dần); lộ trình MySQL sẽ chỉ cách làm tương đương.
+
+## Chữ tiếng Việt có dấu
+
+Quay lại thứ tự thành phố "lạ" ở trên. Khi sắp xếp chữ, cả SQLite lẫn PostgreSQL trong các ô thực hành so từng ký tự từ trái sang phải, như bài 4 đã làm với ngày tháng, và mỗi ký tự được so bằng **mã số** của nó, chứ không theo thứ tự từ điển tiếng Việt. Máy tính lưu mỗi ký tự bằng một con số theo bảng mã Unicode: `T` là 84, `u` là 117, `à` là 224, `ô` là 244, `Đ` là 272. So hai chuỗi là so lần lượt các con số đó. Cụ thể:
+
+- Chữ cái không dấu `a`–`z` có mã nhỏ hơn mọi chữ có dấu. Vì vậy "Huế" đứng trước "Hà Nội": ký tự thứ hai `u` (không dấu) có mã nhỏ hơn `à` (có dấu).
+- `Đ` có mã lớn hơn mọi chữ cái Latin không dấu, nên "Đà Nẵng" xếp **sau** "TP.HCM", cũng như "Đặng Gia Linh" sẽ xếp sau mọi tên bắt đầu bằng chữ không dấu.
+
+<Callout type="try">
+Trong ô sắp xếp theo nhiều cột ở trên, đổi `ORDER BY city, joined_on DESC` thành `ORDER BY city, name`. Trong nhóm Hà Nội, bạn sẽ thấy "Nguyễn Thu Hà" đứng trước "Ngô Đức Thịnh" (vì `u` không dấu nhỏ hơn `ô`), và "Đặng Gia Linh" đứng cuối. Theo từ điển tiếng Việt thì Đặng phải đứng ngay sau Dương, trước Ngô và Nguyễn; và Ngô phải đứng trước Nguyễn.
+</Callout>
+
+Quy tắc so sánh và sắp xếp chữ gọi là **collation**. Cách so theo mã ký tự như trên là collation đơn giản nhất. Một PostgreSQL hay MySQL được cài đặt cho tiếng Việt có thể dùng collation theo ngôn ngữ, khi đó `Đ` đứng ngay sau `D` như trong từ điển. Lộ trình MySQL sẽ nói kỹ về collation. Còn trong các ô thực hành, hãy nhớ: **thứ tự chữ có dấu là thứ tự theo mã, không phải theo từ điển**.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Đặt ORDER BY trước WHERE">
+Thứ tự **viết** các mệnh đề là cố định: `SELECT`, `FROM`, `WHERE`, rồi mới tới `ORDER BY`. Viết `ORDER BY price WHERE category = 'Trà'` làm SQLite báo `near "WHERE": syntax error`. Như bài 2 đã dặn, chỗ sai thật nằm trước vị trí được báo: ở đây là `ORDER BY` đứng sai chỗ.
+</Callout>
+
+<Callout type="warn" title="Tin vào thứ tự khi không có ORDER BY">
+Một câu không có `ORDER BY` có thể trả về đúng thứ tự bạn muốn hàng trăm lần, rồi một ngày đổi khác: khi dữ liệu nhiều lên, khi có index (chỉ mục, bài 31 sẽ giới thiệu), khi đổi phiên bản database. Nếu thứ tự quan trọng (danh sách hiển thị cho người dùng, báo cáo, "10 sản phẩm đắt nhất"), **luôn** viết `ORDER BY`, và thêm cột phụ để không có hàng nào hòa nhau.
+</Callout>
+
+<Callout type="warn" title="DESC chỉ áp dụng cho một cột">
+`ORDER BY city, joined_on DESC` chỉ sắp `joined_on` giảm dần; `city` vẫn tăng dần. Muốn cả hai giảm dần phải viết `DESC` sau từng cột: `ORDER BY city DESC, joined_on DESC`.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| NULL khi sắp tăng dần (`ASC`) | đầu | cuối | đầu |
+| NULL khi sắp giảm dần (`DESC`) | cuối | đầu | cuối |
+| `NULLS FIRST` / `NULLS LAST` | có | có | không |
+| Dùng bí danh trong `ORDER BY` | có | có | có |
+| Sắp chữ có dấu | theo mã ký tự | theo collation (trong ô thực hành: theo mã) | theo collation |
+
+## Tóm tắt
+
+- `ORDER BY cột` sắp kết quả tăng dần (`ASC`, mặc định); `DESC` sắp giảm dần. Với ngày, tăng dần là cũ trước.
+- `ORDER BY` đứng sau `WHERE` và được xử lý sau `SELECT`: FROM → WHERE → SELECT → ORDER BY. Vì vậy nó dùng được bí danh của `SELECT` (trên PostgreSQL, bí danh phải đứng một mình), và cả các cột không có trong `SELECT`.
+- Sắp theo nhiều cột: cột sau chỉ dùng khi cột trước hòa nhau. Mỗi cột có `ASC`/`DESC` riêng.
+- Các hàng hòa nhau không có thứ tự đảm bảo; thêm cột phụ để thứ tự ổn định. Không có `ORDER BY` thì không có thứ tự nào được đảm bảo.
+- Vị trí của NULL khác nhau giữa các database; dùng `NULLS FIRST` / `NULLS LAST` để chỉ rõ (SQLite, PostgreSQL).
+- Trong các ô thực hành, chữ có dấu được sắp theo mã ký tự: "Huế" trước "Hà Nội", "Đà Nẵng" sau "TP.HCM".
+
+## Bài tập
+
+<Exercise hint="Đọc thông báo lỗi. Thứ tự viết các mệnh đề là SELECT, FROM, WHERE, ORDER BY." starter={"SELECT name, joined_on\nORDER BY joined_on\nFROM customers\nWHERE city = 'Hà Nội';\n"}>
+Câu lệnh có sẵn trong ô muốn lấy các khách ở Hà Nội, sắp theo ngày đăng ký từ cũ tới mới, nhưng chạy thì báo lỗi. Hãy sửa cho đúng, giữ nguyên 2 cột `name`, `joined_on` và thứ tự sắp xếp.
+
+```sql
+SELECT name, joined_on
+FROM customers
+WHERE city = 'Hà Nội'
+ORDER BY joined_on;
+```
+</Exercise>
+
+<Exercise hint="Tính giá giảm bằng biểu thức của bài 3, đặt bí danh, rồi sắp theo bí danh đó.">
+Cửa hàng giảm giá 10% mọi sản phẩm. Lập bảng giá mới, **rẻ nhất trước**. Kết quả gồm 2 cột theo thứ tự: tên sản phẩm, giá sau khi giảm (90% giá hiện tại, là số nguyên).
+
+```sql
+SELECT name,
+       price * 90 / 100 AS gia_giam
+FROM products
+ORDER BY gia_giam;
+```
+</Exercise>
+
+<Exercise hint="Tồn kho tăng dần; có hai sản phẩm cùng tồn kho 0, nên cần cột phụ là tên.">
+Lập danh sách ưu tiên nhập hàng: sản phẩm còn **ít nhất** đứng đầu; nếu tồn kho bằng nhau thì sắp theo tên. Kết quả gồm 2 cột theo thứ tự: `name`, `stock`.
+
+```sql
+SELECT name, stock
+FROM products
+ORDER BY stock, name;
+```
+</Exercise>
+
+<Exercise hint="Hai cột sắp xếp: danh mục tăng dần, rồi giá giảm dần trong từng danh mục.">
+Lập bảng giá theo từng danh mục: các sản phẩm cùng danh mục đứng cạnh nhau (danh mục sắp tăng dần), trong mỗi danh mục thì sản phẩm **đắt nhất đứng đầu**. Kết quả gồm 3 cột theo thứ tự: `category`, `name`, `price`.
+
+```sql
+SELECT category,
+       name,
+       price
+FROM products
+ORDER BY category ASC, price DESC;
+```
+</Exercise>
+
+<Exercise hint="Sắp giảm dần thì SQLite đặt NULL ở đâu? Đề bài muốn NULL ở đâu? Các đơn cùng chưa gửi thì cần cột phụ.">
+Lập danh sách theo dõi các đơn **chưa giao xong** (trạng thái khác "đã giao", kể cả đơn đã hủy): sắp theo **ngày gửi mới nhất trước**, nhưng các **đơn chưa gửi** (chưa có ngày gửi) phải **đứng đầu** để nhân viên chú ý; giữa các đơn chưa gửi thì sắp theo mã đơn tăng dần. Kết quả gồm 3 cột theo thứ tự: `id`, `status`, `shipped_on`.
+
+```sql
+SELECT id,
+       status,
+       shipped_on
+FROM orders
+WHERE status <> 'đã giao'
+ORDER BY shipped_on DESC NULLS FIRST, id;
+```
+</Exercise>
+
+Giờ bạn đã sắp xếp được kết quả. Câu hỏi tự nhiên tiếp theo là "cho tôi 3 sản phẩm đắt nhất" hay "trang thứ hai của danh sách": bài tiếp theo dạy `LIMIT` và `OFFSET` để lấy một phần kết quả, cùng `DISTINCT` để loại các hàng trùng lặp (duplicate).

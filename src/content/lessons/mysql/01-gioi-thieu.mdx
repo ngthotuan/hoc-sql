@@ -1,0 +1,42 @@
+---
+title: Làm quen MySQL
+description: MySQL khác SQL chuẩn ở đâu, và cách lộ trình này giúp bạn thực hành.
+order: 1
+---
+
+MySQL là database mã nguồn mở phổ biến nhất cho web, đứng sau rất nhiều hệ thống như WordPress hay Shopify.
+
+## Cách thực hành trong lộ trình này
+
+MySQL chưa có bản chạy được trên trình duyệt. Vì vậy:
+
+- Những câu lệnh giống nhau giữa các database sẽ chạy thật bằng SQLite ngay trên trang.
+- Những cú pháp chỉ MySQL mới có sẽ được trình bày kèm kết quả mẫu, đánh dấu rõ là ví dụ.
+- Muốn chạy MySQL thật, bạn có thể dùng Docker trên máy mình:
+
+```bash
+docker run --name hoc-mysql -e MYSQL_ROOT_PASSWORD=matkhau -p 3306:3306 -d mysql:8
+```
+
+## Phần giống nhau: chạy được ngay
+
+<Playground>
+```sql
+SELECT category, COUNT(*) AS so_san_pham
+FROM products
+GROUP BY category;
+```
+</Playground>
+
+## Phần riêng của MySQL: ví dụ
+
+MySQL dùng dấu backtick để bọc tên bảng/cột, và có cú pháp "thêm mới, nếu trùng khóa thì cập nhật":
+
+```sql
+INSERT INTO products (id, name, category, price)
+VALUES (1, 'Cà phê phin nhôm', 'Dụng cụ', 49000)
+ON DUPLICATE KEY UPDATE `price` = VALUES(`price`);
+-- Query OK, 2 rows affected
+```
+
+"2 rows affected" ở đây nghĩa là MySQL đã *cập nhật* một hàng có sẵn, chứ không thêm hàng mới. Bài sau sẽ so sánh câu này với `ON CONFLICT` của PostgreSQL.

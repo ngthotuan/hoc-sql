@@ -1,0 +1,218 @@
+---
+title: LIMIT, OFFSET và DISTINCT
+description: Lấy N hàng đầu tiên, chia kết quả thành từng trang, và loại các hàng trùng lặp; hiểu vì sao LIMIT luôn cần ORDER BY và DISTINCT xử lý NULL thế nào.
+order: 9
+---
+
+Bài trước, bạn đã sắp xếp được cả bảng giá từ đắt tới rẻ. Nhưng chủ cửa hàng thường không cần cả bảng: "cho tôi xem **3 sản phẩm** đắt nhất", hay trang web chỉ hiện **mỗi trang 5 đơn**. Một câu hỏi khác cũng hay gặp: "cửa hàng có khách ở **những thành phố nào**?", câu trả lời là danh sách thành phố, mỗi thành phố một lần, chứ không phải 12 hàng (row), mỗi khách một hàng, trong đó Hà Nội lặp lại 4 lần. Những hàng giống nhau như vậy gọi là hàng trùng lặp (duplicate).
+
+Bài này giới thiệu ba từ khóa (keyword): `LIMIT` để lấy một số hàng đầu tiên, `OFFSET` để bỏ qua một số hàng, và `DISTINCT` để loại các hàng trùng lặp.
+
+## LIMIT: lấy N hàng đầu tiên
+
+`LIMIT n` đứng **cuối cùng** trong câu truy vấn (query), sau `ORDER BY`, và giữ lại tối đa `n` hàng đầu tiên của kết quả (result set):
+
+<Playground>
+```sql
+SELECT name, price
+FROM products
+ORDER BY price DESC
+LIMIT 3;
+```
+</Playground>
+
+Kết quả có **3 hàng**: máy xay cà phê (450000), trà sen Tây Hồ (390000) và trà shan tuyết (260000). Database sắp cả 12 sản phẩm theo giá giảm dần như bài 8, rồi chỉ giữ 3 hàng đầu.
+
+`LIMIT` được xử lý **sau** `ORDER BY`. Thứ tự xử lý logic giờ đầy đủ hơn:
+
+1. **FROM**: lấy dữ liệu từ bảng (table).
+2. **WHERE**: bỏ những hàng không thỏa điều kiện (condition).
+3. **SELECT**: tính biểu thức (expression), chọn cột (column), đặt bí danh (alias). `DISTINCT` (phần sau của bài) loại hàng trùng ngay ở bước này.
+4. **ORDER BY**: sắp xếp.
+5. **LIMIT / OFFSET**: bỏ qua số hàng của `OFFSET` (phần sau của bài), rồi cắt lấy số hàng của `LIMIT`.
+
+Nếu kết quả có ít hàng hơn `n`, `LIMIT` không báo lỗi mà trả về toàn bộ. Ví dụ chỉ có 3 loại trà, `WHERE category = 'Trà' ... LIMIT 10` vẫn chỉ ra 3 hàng.
+
+## Muốn lấy N hàng đầu tiên thì cần ORDER BY
+
+`LIMIT` chỉ có ý nghĩa khi bạn biết "đầu tiên" là theo thứ tự nào. Không có `ORDER BY`, như bài 1 và bài 8 đã dặn, database được trả các hàng theo thứ tự tùy ý, nên `LIMIT 3` sẽ là "3 hàng bất kỳ". Câu lệnh (statement) vẫn chạy, kết quả hôm nay có thể trông hợp lý, nhưng không có gì đảm bảo ngày mai vẫn vậy. `LIMIT` không kèm `ORDER BY` chỉ hợp khi bạn muốn xem thử vài hàng của một bảng lạ, không quan tâm là hàng nào.
+
+Ngay cả khi có `ORDER BY`, hãy để ý các hàng **hòa nhau ở ranh giới**:
+
+<Playground>
+```sql
+SELECT name, stock
+FROM products
+ORDER BY stock
+LIMIT 1;
+```
+</Playground>
+
+Câu này muốn tìm "sản phẩm tồn kho ít nhất" và trả về 1 hàng. Nhưng có **hai** sản phẩm cùng `stock` bằng 0: bình giữ nhiệt và bánh pía. Database chọn một trong hai, và như bài 8 đã nói, thứ tự giữa các hàng hòa nhau không được đảm bảo. Kết quả vừa sai về ý (bỏ sót một sản phẩm hết hàng), vừa có thể đổi giữa các lần chạy.
+
+Cách xử lý tùy câu hỏi. Nếu thật sự cần một hàng, hãy thêm tiêu chí phụ để phá thế hòa (`ORDER BY stock, name`). Nếu câu hỏi là "những sản phẩm hết hàng", thì `WHERE stock = 0` mới đúng, không cần `LIMIT`.
+
+## OFFSET: phân trang
+
+`OFFSET m` bỏ qua `m` hàng đầu tiên rồi mới bắt đầu lấy. Kết hợp với `LIMIT`, bạn chia kết quả thành từng **trang**, như cách một trang web hiện danh sách đơn hàng mỗi lần 5 đơn:
+
+<Playground>
+```sql
+-- Trang 1: đơn mới nhất, 5 đơn mỗi trang
+SELECT id, ordered_on
+FROM orders
+ORDER BY ordered_on DESC, id DESC
+LIMIT 5 OFFSET 0;
+
+-- Trang 2
+SELECT id, ordered_on
+FROM orders
+ORDER BY ordered_on DESC, id DESC
+LIMIT 5 OFFSET 5;
+```
+</Playground>
+
+Trang 1 gồm 5 đơn mới nhất, từ đơn 20 (2025-11-16) tới đơn 16 (2025-11-03). Trang 2 bỏ qua 5 đơn đó và lấy 5 đơn kế tiếp, từ đơn 15 (2025-10-30) tới đơn 11 (2025-09-10).
+
+Công thức cho trang thứ `k`, mỗi trang `n` hàng: `LIMIT n OFFSET (k - 1) * n`. Bảng có 20 đơn nên với 5 đơn mỗi trang có đúng 4 trang; trang 4 dùng `OFFSET 15` và chứa 5 đơn cũ nhất (đơn 5 tới đơn 1). Trang 5 (`OFFSET 20`) không lỗi, chỉ trả về 0 hàng.
+
+Phân trang càng cần `ORDER BY` có thứ tự duy nhất. Trong dataset, mỗi đơn có một ngày đặt khác nhau, nhưng câu ở trên vẫn thêm `id DESC` làm tiêu chí phụ, vì trong thực tế nhiều đơn có thể đặt cùng ngày. Nếu hai đơn hòa nhau ở ranh giới giữa hai trang, một đơn có thể xuất hiện ở cả hai trang, hoặc không xuất hiện ở trang nào.
+
+<Callout type="note" title="OFFSET lớn thì chậm">
+Để bỏ qua 10000 hàng, database vẫn phải đi qua 10000 hàng đó rồi mới vứt đi. Với bảng nhỏ không sao, nhưng trang thứ một nghìn của một bảng lớn có thể chậm thấy rõ. Các hệ thống lớn thường phân trang theo cách khác ("lấy các đơn cũ hơn đơn cuối cùng của trang trước"), ví dụ trang sau trang 1 ở trên là `WHERE ordered_on < '2025-11-03' ORDER BY ordered_on DESC LIMIT 5`, với `'2025-11-03'` là ngày của đơn cuối trang 1. Ví dụ này giả định mỗi ngày chỉ có một đơn; nếu nhiều đơn có thể trùng ngày, điều kiện phải xét cả `id`, như tiêu chí phụ ở trên.
+</Callout>
+
+## DISTINCT: loại hàng trùng lặp
+
+`SELECT DISTINCT` giữ lại **mỗi giá trị khác nhau một lần**:
+
+<Playground>
+```sql
+SELECT DISTINCT city
+FROM customers;
+```
+</Playground>
+
+Kết quả có **6 hàng**: 6 thành phố khác nhau, dù bảng có 12 khách. Hà Nội xuất hiện 4 lần trong bảng nhưng chỉ một lần trong kết quả. `DISTINCT` không sắp xếp; muốn danh sách theo thứ tự thì thêm `ORDER BY` như bình thường. Lưu ý trên PostgreSQL: khi có `DISTINCT`, `ORDER BY` chỉ được dùng các cột có trong `SELECT`. Lý do: sau khi `DISTINCT` gộp nhiều hàng thành một, cột không được chọn có thể có nhiều giá trị khác nhau. Ví dụ khách 6 có 3 đơn ở 3 ngày khác nhau, nên `SELECT DISTINCT customer_id FROM orders ORDER BY ordered_on` không biết dùng ngày nào để sắp khách 6. PostgreSQL từ chối câu này, còn SQLite tự chọn một giá trị và cho ra một thứ tự khó đoán.
+
+### DISTINCT trên nhiều cột
+
+Khi có nhiều cột sau `DISTINCT`, database loại những hàng trùng **trên toàn bộ các cột đó cùng lúc**, chứ không phải trên từng cột riêng:
+
+<Playground>
+```sql
+SELECT DISTINCT product_id, unit_price
+FROM order_items
+WHERE product_id IN (2, 3);
+```
+</Playground>
+
+Kết quả có **3 hàng**. Cà phê Arabica (sản phẩm 3) được bán ở 3 đơn, luôn với giá 165000, nên chỉ còn một hàng `3 | 165000`. Còn cà phê Robusta (sản phẩm 2) xuất hiện **hai lần**: `2 | 110000` và `2 | 120000`. Hai hàng này khác nhau ở cột `unit_price` nên không bị coi là trùng. Đây chính là chuyện tăng giá Robusta mà bạn đã thấy từ bài 1: `DISTINCT` cho thấy nhanh sản phẩm đã từng được bán với những mức giá nào.
+
+### DISTINCT và NULL
+
+Bài 7 nói `NULL = NULL` không đúng, vì hai giá trị "không biết" không thể khẳng định là bằng nhau. Vậy `DISTINCT` xử lý các NULL thế nào?
+
+<Playground>
+```sql
+SELECT DISTINCT referred_by
+FROM customers;
+```
+</Playground>
+
+Kết quả có **6 hàng**: 5 mã người giới thiệu khác nhau (1, 2, 3, 4, 6) và **một** hàng NULL. Năm khách tự tìm đến đều có `referred_by` là NULL, và `DISTINCT` gộp cả 5 thành một. Với `DISTINCT` (và một số chỗ khác bạn sẽ gặp, như gom nhóm ở bài 13), SQL coi các NULL là **giống nhau**. Đây là một ngoại lệ có chủ đích: nếu mỗi NULL đứng riêng một hàng, danh sách "các giá trị khác nhau" sẽ đầy những hàng NULL vô nghĩa.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="LIMIT đứng trước ORDER BY">
+Thứ tự viết là `... WHERE ... ORDER BY ... LIMIT ... OFFSET ...`. SQLite và MySQL bắt buộc `LIMIT` đứng trước `OFFSET`; PostgreSQL nhận cả hai thứ tự, nhưng nên viết `LIMIT` trước cho thống nhất. Viết `LIMIT 3 ORDER BY price` làm SQLite báo `near "ORDER": syntax error`. Cách nhớ: `LIMIT` "cắt" kết quả, nên phải đứng sau mọi thứ quyết định kết quả trông như thế nào.
+</Callout>
+
+<Callout type="warn" title="Nghĩ DISTINCT chỉ áp dụng cho cột đầu tiên">
+`SELECT DISTINCT city, name FROM customers` **không** cho ra 6 thành phố. Vì mỗi khách có tên khác nhau, mọi cặp (thành phố, tên) đều khác nhau, nên kết quả vẫn có đủ 12 hàng. `DISTINCT` luôn xét toàn bộ các cột trong `SELECT`. Muốn danh sách thành phố thì chỉ chọn cột thành phố.
+</Callout>
+
+<Callout type="warn" title="Dùng DISTINCT để che lỗi">
+Khi kết quả có hàng trùng mà bạn không ngờ tới, thêm `DISTINCT` cho "sạch" là một phản xạ nguy hiểm. Hàng trùng thường là dấu hiệu câu truy vấn sai ở chỗ khác (bạn sẽ gặp nhiều ở bài JOIN). Hãy tìm hiểu vì sao có hàng trùng trước khi quyết định loại bỏ chúng.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| `LIMIT n OFFSET m` | có | có | có |
+| `LIMIT m, n` (bỏ m, lấy n) | có | không | có |
+| `FETCH FIRST n ROWS ONLY` (chuẩn SQL) | không | có | không |
+| `OFFSET m LIMIT n` (OFFSET trước) | lỗi | có | lỗi |
+| `DISTINCT` + `ORDER BY` cột không có trong `SELECT` | chạy được | lỗi | lỗi |
+
+`LIMIT m, n` là cách viết tắt dễ nhầm, vì số đầu tiên là số hàng **bỏ qua** chứ không phải số hàng lấy. Khóa học luôn viết `LIMIT n OFFSET m` cho rõ nghĩa.
+
+## Tóm tắt
+
+- `LIMIT n` giữ tối đa `n` hàng đầu tiên; `OFFSET m` bỏ qua `m` hàng đầu. Cả hai đứng cuối câu, sau `ORDER BY`, và được xử lý sau cùng.
+- Không có `ORDER BY` thì `LIMIT` lấy các hàng bất kỳ. Có `ORDER BY` mà có hàng hòa nhau ở ranh giới thì kết quả vẫn không ổn định: thêm tiêu chí phụ, hoặc xem lại câu hỏi có thật cần `LIMIT` không.
+- Trang thứ `k`, mỗi trang `n` hàng: `LIMIT n OFFSET (k - 1) * n`.
+- `SELECT DISTINCT` giữ mỗi tổ hợp giá trị khác nhau một lần, xét **toàn bộ** các cột được chọn.
+- `DISTINCT` coi các NULL là giống nhau và gộp chúng thành một hàng.
+- Hàng trùng bất ngờ là dấu hiệu cần tìm nguyên nhân, không phải lý do để thêm `DISTINCT`.
+
+## Bài tập
+
+<Exercise hint="Thành tiền là quantity * unit_price (bài 3). Có hai hàng cùng thành tiền cao nhất: đề yêu cầu phá hòa bằng mã đơn.">
+Tìm **3 hàng** trong chi tiết đơn hàng có **thành tiền lớn nhất**, lớn nhất trước; các hàng cùng thành tiền thì xếp theo mã đơn tăng dần. Kết quả gồm 3 cột theo thứ tự: `order_id`, `product_id`, thành tiền.
+
+```sql
+SELECT order_id,
+       product_id,
+       quantity * unit_price AS thanh_tien
+FROM order_items
+ORDER BY thanh_tien DESC, order_id
+LIMIT 3;
+```
+</Exercise>
+
+<Exercise hint="Thứ tự viết là ORDER BY, rồi LIMIT, rồi OFFSET." starter={"SELECT name, price\nFROM products\nORDER BY price\nOFFSET 3\nLIMIT 3;\n"}>
+Câu lệnh có sẵn trong ô muốn lấy **trang 2** của bảng giá (rẻ nhất trước, mỗi trang 3 sản phẩm), nhưng chạy thì báo lỗi. Hãy sửa cho đúng, giữ nguyên 2 cột `name`, `price`.
+
+```sql
+SELECT name, price
+FROM products
+ORDER BY price
+LIMIT 3 OFFSET 3;
+```
+</Exercise>
+
+<Exercise hint="Trang 2, mỗi trang 4 khách: bỏ qua bao nhiêu khách?">
+Trang quản lý hiện danh sách khách theo **ngày đăng ký, cũ nhất trước**, mỗi trang **4 khách**. Lấy **trang 2**. Kết quả gồm 2 cột theo thứ tự: `name`, `joined_on`.
+
+```sql
+SELECT name, joined_on
+FROM customers
+ORDER BY joined_on
+LIMIT 4 OFFSET 4;
+```
+</Exercise>
+
+<Exercise hint="Lọc sản phẩm sắp hết bằng WHERE, rồi lấy các danh mục khác nhau.">
+Những **danh mục** nào đang có sản phẩm **tồn kho thấp** (tồn kho dưới 20, kể cả sản phẩm đã hết hàng)? Mỗi danh mục chỉ xuất hiện một lần. Kết quả gồm 1 cột: `category`.
+
+```sql
+SELECT DISTINCT category
+FROM products
+WHERE stock < 20;
+```
+</Exercise>
+
+<Exercise hint="DISTINCT trên 2 cột: mỗi cặp (mã khách, trạng thái) chỉ một lần. Lọc 3 khách bằng IN, rồi sắp theo mã khách và trạng thái.">
+Với 3 khách số 1, 2 và 6, liệt kê mỗi **cặp (mã khách, trạng thái đơn)** khác nhau một lần, để biết mỗi khách đang có đơn ở những trạng thái nào. Sắp theo mã khách tăng dần, rồi theo trạng thái tăng dần. Kết quả gồm 2 cột theo thứ tự: `customer_id`, `status`.
+
+```sql
+SELECT DISTINCT customer_id, status
+FROM orders
+WHERE customer_id IN (1, 2, 6)
+ORDER BY customer_id, status;
+```
+</Exercise>
+
+Bạn đã lọc, sắp xếp và cắt được kết quả, nhưng mọi giá trị vẫn hiện y như được lưu. Bài tiếp theo giới thiệu các hàm xử lý chữ, số và ngày tháng, để biến đổi giá trị ngay trong câu truy vấn, như viết hoa tên, làm tròn số, hay lấy năm từ một ngày.

@@ -1,0 +1,199 @@
+---
+import { getCollection, render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import Playground from '../../components/Playground.astro';
+import Callout from '../../components/Callout.astro';
+import TableWrap from '../../components/TableWrap.astro';
+import Exercise from '../../components/Exercise.astro';
+import ShopDiagram from '../../components/ShopDiagram.astro';
+import { trackById, type TrackId } from '../../data/tracks';
+import { withBase } from '../../lib/url';
+import { lessonsByTrack, slugOf, trackOf, urlOf, type Lesson } from '../../lib/lessons';
+
+export async function getStaticPaths() {
+  const all: Lesson[] = await getCollection('lessons');
+  return all.map((lesson) => ({
+    params: { track: trackOf(lesson), slug: slugOf(lesson) },
+    props: { lesson },
+  }));
+}
+
+const { lesson } = Astro.props as { lesson: Lesson };
+const track = trackById(trackOf(lesson))!;
+const siblings = await lessonsByTrack(track.id as TrackId);
+const idx = siblings.findIndex((l: Lesson) => l.id === lesson.id);
+const prev = siblings[idx - 1];
+const next = siblings[idx + 1];
+const { Content } = await render(lesson);
+---
+
+<Base title={`${lesson.data.title} | ${track.name}`} description={lesson.data.description} current={track.id}>
+  <div class="wrap lesson-shell">
+    <nav class="toc" aria-label={`Các bài trong ${track.name}`}>
+      <button type="button" class="toc-toggle" data-toc-toggle aria-controls="toc-list" aria-expanded="true" title="Ẩn mục lục">
+        <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+          <rect x="2.5" y="3.5" width="15" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" />
+          <path d="M7.5 3.5v13" stroke="currentColor" stroke-width="1.5" />
+          <path class="toc-toggle-fill" d="M3.25 4.25h3.5v11.5h-3.5z" fill="currentColor" />
+        </svg>
+        <span class="toc-toggle-text">Ẩn mục lục</span>
+      </button>
+      <details open data-toc id="toc-list">
+        <summary>
+          <span>Mục lục</span>
+          <span class="toc-pos">Bài {idx + 1}/{siblings.length}</span>
+        </summary>
+        <a class="toc-track" href={withBase(`/${track.id}/`)}>{track.name}</a>
+        <ol>
+          {siblings.map((l: Lesson) => (
+            <li value={l.data.order}>
+              <a href={urlOf(l)} aria-current={l.id === lesson.id ? 'page' : undefined} data-astro-prefetch>
+                {l.data.title}
+              </a>
+            </li>
+          ))}
+        </ol>
+      </details>
+    </nav>
+    <script is:inline>
+      // Điện thoại: mục lục thu gọn mặc định để nội dung bài lên đầu
+      if (matchMedia('(max-width: 860px)').matches) document.querySelector('[data-toc]').removeAttribute('open');
+
+      // Máy tính: nút ẩn/hiện mục lục, nhớ lựa chọn trong localStorage
+      (function () {
+        var root = document.documentElement;
+        var btn = document.querySelector('[data-toc-toggle]');
+        var text = btn.querySelector('.toc-toggle-text');
+        function sync() {
+          var hidden = root.dataset.toc === 'hidden';
+          var label = hidden ? 'Hiện mục lục' : 'Ẩn mục lục';
+          btn.setAttribute('aria-expanded', String(!hidden));
+          btn.title = label;
+          text.textContent = label;
+        }
+        btn.addEventListener('click', function () {
+          if (root.dataset.toc === 'hidden') delete root.dataset.toc;
+          else root.dataset.toc = 'hidden';
+          try { localStorage.setItem('toc', root.dataset.toc === 'hidden' ? 'hidden' : 'shown'); } catch (e) {}
+          sync();
+        });
+        sync();
+      })();
+    </script>
+
+    <main id="main" class="prose">
+      <h1>{lesson.data.title}</h1>
+      <p class="lesson-desc">{lesson.data.description}</p>
+      <Content components={{ Playground, Callout, Exercise, ShopDiagram, table: TableWrap }} />
+
+      <nav class="pager" aria-label="Chuyển bài">
+        {prev ? <a href={urlOf(prev)} rel="prev" data-astro-prefetch><span>Bài trước</span>{prev.data.title}</a> : <span />}
+        {next && <a href={urlOf(next)} rel="next" class="next" data-astro-prefetch><span>Bài tiếp</span>{next.data.title}</a>}
+      </nav>
+    </main>
+  </div>
+</Base>
+
+<style>
+  .lesson-shell {
+    display: grid;
+    grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr);
+    gap: clamp(2rem, 5vw, 4.5rem);
+    padding-block: var(--space-6) var(--space-8);
+  }
+
+  /* Mục lục */
+  .toc { position: sticky; top: var(--space-5); align-self: start; font-size: var(--step--1); }
+  .toc summary { display: none; }
+  .toc-track { display: block; font-weight: 700; text-decoration: none; margin-bottom: var(--space-3); color: var(--ink); }
+  .toc ol { margin: 0; padding-left: 1.5rem; color: var(--ink-faint); }
+  .toc li { padding: 0.2rem 0; }
+  .toc li::marker { font-family: var(--font-code); font-size: 0.8rem; }
+  .toc li a {
+    display: inline-block;
+    padding: 0.1rem 0.35rem;
+    margin-left: -0.35rem;
+    text-decoration: none;
+    color: var(--ink-soft);
+    border-radius: var(--radius-s);
+  }
+  .toc li a:hover { color: var(--ink); background: var(--surface); }
+  .toc li a[aria-current='page']:hover { background: var(--mark); }
+
+  /* Nút ẩn/hiện mục lục (chỉ trên máy tính) */
+  .toc-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0 0 var(--space-3) -0.5rem;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-s);
+    background: none;
+    color: var(--ink-soft);
+    font: inherit;
+    cursor: pointer;
+  }
+  .toc-toggle:hover { color: var(--ink); background: var(--surface); border-color: var(--rule); }
+  .toc-toggle svg { flex: none; }
+
+  @media (min-width: 861px) {
+    :global(html[data-toc='hidden']) .lesson-shell { grid-template-columns: 2.5rem minmax(0, 1fr); }
+    :global(html[data-toc='hidden']) .toc details { display: none; }
+    :global(html[data-toc='hidden']) .toc-toggle { margin-left: 0; padding: 0.4rem; border-color: var(--rule); background: var(--surface); }
+    :global(html[data-toc='hidden']) .toc-toggle-text {
+      position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+    }
+    :global(html[data-toc='hidden']) .toc-toggle-fill { opacity: 0; }
+    :global(html[data-toc='hidden']) .lesson-shell > main { justify-self: center; width: 100%; }
+  }
+
+  .lesson-desc { font-size: var(--step-1); color: var(--ink-soft); line-height: 1.45; margin-bottom: var(--space-6); }
+
+  /* Chuyển bài */
+  .pager {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-top: var(--space-8);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--rule);
+  }
+  .pager a {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    max-width: 48%;
+    padding: var(--space-2) var(--space-3);
+    margin: calc(var(--space-2) * -1) calc(var(--space-3) * -1);
+    border-radius: var(--radius-s);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .pager a:hover { background: var(--surface); }
+  .pager a span { font-weight: 400; font-size: var(--step--1); color: var(--ink-soft); }
+  .pager .next { text-align: right; margin-left: auto; }
+
+  @media (max-width: 860px) {
+    .lesson-shell { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); padding-top: var(--space-4); }
+    .toc { position: static; }
+    .toc-toggle { display: none; }
+    .toc details {
+      border: 1px solid var(--rule);
+      border-radius: var(--radius-m);
+      background: var(--surface);
+      padding: 0 var(--space-4);
+    }
+    .toc summary {
+      display: flex;
+      justify-content: space-between;
+      padding: var(--space-3) 0;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--ink);
+    }
+    .toc-pos { font-weight: 400; color: var(--ink-soft); }
+    .toc details[open] { padding-bottom: var(--space-3); }
+    .toc details[open] summary { border-bottom: 1px solid var(--rule); margin-bottom: var(--space-3); }
+  }
+</style>

@@ -1,0 +1,264 @@
+---
+title: Khóa chính, khóa ngoại và quan hệ
+description: Hiểu khóa chính, khóa ngoại và đọc được sơ đồ quan hệ giữa 4 bảng của cửa hàng.
+order: 15
+---
+
+Bài 14 tìm được những khách đặt từ 3 đơn trở lên, nhưng kết quả (result set) chỉ ghi `customer_id` là 1, 2, 6. Muốn biết khách 6 tên gì, bạn phải mở bảng (table) `customers` ra tra. Vì sao bảng `orders` không ghi luôn tên khách cho tiện?
+
+Câu trả lời nằm ở cách database tổ chức dữ liệu: mỗi loại thông tin ở một bảng riêng, và các bảng **trỏ tới nhau bằng mã**. Bài này giải thích hai loại cột làm nên sự liên kết đó, khóa chính và khóa ngoại, đọc sơ đồ quan hệ của 4 bảng cửa hàng, và cho thấy vì sao tách bảng là cách làm đúng. Bài không có từ khóa (keyword) SQL mới, nhưng nó là nền móng cho mọi bài về nối bảng phía sau.
+
+## Khóa chính: mỗi hàng một mã duy nhất
+
+Khóa chính (primary key) là cột (column), hoặc nhóm cột, mà giá trị của nó **xác định duy nhất một hàng** (row) trong bảng. Hai yêu cầu:
+
+- **Không trùng**: không có hai hàng cùng giá trị khóa chính.
+- **Không NULL**: hàng nào cũng phải có khóa chính. Một hàng không có mã thì không ai chỉ tới được.
+
+Trong bảng `customers`, `products` và `orders`, khóa chính là cột `id` (được khai báo khi tạo bảng; sơ đồ bên dưới đánh dấu nó). Ta xem thử giá trị của vài cột có trùng nhau không, bằng `COUNT` của bài 12:
+
+<Playground>
+```sql
+SELECT COUNT(*) AS so_hang,
+       COUNT(DISTINCT id) AS so_id,
+       COUNT(DISTINCT name) AS so_ten,
+       COUNT(DISTINCT city) AS so_thanh_pho
+FROM customers;
+```
+</Playground>
+
+`so_hang` và `so_id` đều bằng 12: mỗi khách một `id` riêng. `so_thanh_pho` chỉ là 6, nên `city` rõ ràng không thể làm khóa chính. Còn `so_ten` cũng bằng 12: hiện tại không có hai khách trùng tên. Vậy sao không dùng `name` làm khóa chính? Vì "hiện tại không trùng" khác với "**không bao giờ** trùng". Chỉ cần thêm một khách thứ hai tên Nguyễn Thu Hà là tên hết còn duy nhất. Khóa chính phải là thứ được **bảo đảm** duy nhất, và database sẽ từ chối mọi thao tác làm nó trùng.
+
+Đó là lý do người ta thường dùng một con số tự đặt như `id`, chứ không dùng thông tin thật như tên, email hay số điện thoại. Thông tin thật có thể trùng, có thể thay đổi (khách đổi số điện thoại), hoặc có thể thiếu (bài 7: 5 khách không có `phone`). Một mã số không mang ý nghĩa gì thì hầu như không có lý do để đổi. Đây cũng là lý do bài 13 nói PostgreSQL cho phép chọn các cột khác khi gom theo khóa chính: mỗi nhóm chắc chắn chỉ có một hàng.
+
+<Callout type="note" title="Khóa chính không phải lúc nào cũng tên là id">
+`id` chỉ là quy ước đặt tên phổ biến. Cột nào cũng có thể là khóa chính nếu được khai báo như vậy khi tạo bảng. Bài 26 và 27 sẽ dạy cách khai báo.
+</Callout>
+
+### Khóa chính gồm hai cột
+
+Bảng `order_items` không có cột `id`. Mỗi hàng là "một sản phẩm trong một đơn", nên nó được định danh bằng **cặp** `(order_id, product_id)`, như bài 1 đã nhắc:
+
+<Playground>
+```sql
+SELECT COUNT(*) AS so_hang,
+       COUNT(DISTINCT order_id) AS so_don,
+       COUNT(DISTINCT product_id) AS so_san_pham
+FROM order_items;
+```
+</Playground>
+
+Bảng có 34 hàng, nhưng chỉ 20 giá trị `order_id` khác nhau và 11 giá trị `product_id` khác nhau. Một mình `order_id` lặp lại (đơn 5 có 3 hàng), một mình `product_id` cũng lặp lại (Robusta có trong 5 đơn). Chỉ **cặp** hai cột mới không trùng: một đơn không bao giờ có hai hàng cho cùng một sản phẩm, vì nếu khách mua 2 gói thì ghi `quantity` là 2 chứ không thêm hàng. Khóa chính gồm nhiều cột như vậy gọi là khóa ghép (composite key).
+
+<Callout type="try">
+Tự kiểm chứng cặp không trùng bằng kiến thức bài 13–14: gom `order_items` theo cặp `order_id, product_id` và chỉ giữ những nhóm có `COUNT(*) > 1`. Kết quả có 0 hàng, tức không cặp nào xuất hiện hai lần.
+</Callout>
+
+## Khóa ngoại: trỏ tới khóa chính của bảng khác
+
+Bảng `orders` có cột `customer_id`. Giá trị của nó **là** một `id` trong bảng `customers`. Một cột như vậy gọi là khóa ngoại (foreign key): cột mà nếu có giá trị thì giá trị đó phải khớp với khóa chính của một bảng khác (hoặc của chính bảng đó). Khóa ngoại cũng có thể trỏ tới một cột không trùng khác, nhưng trỏ tới khóa chính là trường hợp thường gặp nhất; bài 27 sẽ nói thêm.
+
+Đi theo khóa ngoại bằng tay sẽ thấy cơ chế. Đơn 14 của ai?
+
+<Playground>
+```sql
+-- Bước 1: đơn 14 ghi customer_id nào?
+SELECT id,
+       customer_id,
+       ordered_on,
+       status
+FROM orders
+WHERE id = 14;
+
+-- Bước 2: tra customer_id đó trong bảng customers
+SELECT id,
+       name,
+       city
+FROM customers
+WHERE id = 3;
+```
+</Playground>
+
+Bảng đầu cho biết đơn 14 đặt ngày 2025-10-18, đã giao, và `customer_id` là 3. Bảng sau tra mã 3 trong `customers`: đó là Lê Bảo Ngọc ở Đà Nẵng. Hai câu truy vấn (query), hai bước, và bạn phải tự chép con số 3 từ kết quả đầu sang câu sau. Bài 16 sẽ giới thiệu phép nối (JOIN) để database tự làm việc nối này trong một câu lệnh (statement).
+
+Khóa ngoại không cần là duy nhất: nhiều đơn có thể cùng trỏ tới khách 3. Nó chỉ cần **trỏ tới một hàng có thật**, hoặc là NULL nếu cột cho phép (xem phần tự tham chiếu bên dưới).
+
+### Database giữ cho khóa ngoại luôn đúng
+
+Khi bảng được khai báo khóa ngoại, database kiểm tra mỗi lần dữ liệu thay đổi (với SQLite thì cần bật thêm, xem ghi chú bên dưới). Nếu ai đó cố thêm một đơn với `customer_id` là 99 (không có khách 99), câu lệnh bị từ chối:
+
+```
+SQLite:      FOREIGN KEY constraint failed
+PostgreSQL:  insert or update on table "orders" violates foreign key constraint "orders_customer_id_fkey"
+```
+
+Tương tự, thêm một khách mới với `id` là 3 (đã có Lê Bảo Ngọc) cũng bị từ chối, vì khóa chính không được trùng: SQLite báo `UNIQUE constraint failed: customers.id`, PostgreSQL báo `duplicate key value violates unique constraint "customers_pkey"`. Những quy tắc này gọi là ràng buộc (constraint). Nhờ chúng, và vì `orders.customer_id` còn được khai báo không được NULL, bạn có thể tin rằng mọi `customer_id` trong `orders` đều tra được ra một khách thật. Cách thêm dữ liệu sẽ học ở bài 24, cách khai báo ràng buộc ở bài 27.
+
+<Callout type="note" title="SQLite chỉ kiểm tra khóa ngoại khi được bật">
+PostgreSQL và MySQL (với InnoDB, cách lưu trữ mặc định của MySQL; lộ trình MySQL sẽ nói kỹ) mặc định luôn kiểm tra khóa ngoại. SQLite thì **mặc định không kiểm tra**, vì lý do tương thích với các phiên bản cũ: phải bật bằng lệnh `PRAGMA foreign_keys = ON` cho mỗi lần mở database. Các ô thực hành của khóa học đã bật sẵn, nên trong các ô thực hành, những thao tác như trên sẽ bị từ chối với thông báo vừa nêu. Khi dùng SQLite ở nơi khác, đừng mặc định là khóa ngoại được bảo vệ. SQLite còn một điểm dễ dãi nữa: cột khóa chính không phải kiểu `INTEGER` vẫn nhận NULL nếu không khai báo thêm "không được NULL". Bài 27 sẽ nói kỹ cả hai điều.
+</Callout>
+
+## Sơ đồ quan hệ của cửa hàng
+
+Toàn bộ liên kết giữa 4 bảng có thể vẽ thành một sơ đồ:
+
+<ShopDiagram />
+
+Đọc sơ đồ: mỗi khung là một bảng, cột in đậm gạch chân là khóa chính (PK), cột ghi FK là khóa ngoại. `order_items` có hai cột in đậm vì khóa chính của nó là **cặp** hai cột (khóa ghép ở trên), không phải hai khóa chính. Nhãn `PK, FK` nghĩa là cột đó vừa thuộc khóa chính, vừa là khóa ngoại trỏ sang bảng khác. Mỗi mũi tên là một khóa ngoại: đầu có mũi tên (khóa chính) là phía **một**, đầu kia (bảng giữ khóa ngoại) là phía **nhiều**. Có bốn mũi tên, tức bốn khóa ngoại:
+
+| Khóa ngoại | Trỏ tới | Ý nghĩa |
+|---|---|---|
+| `orders.customer_id` | `customers.id` | đơn này của khách nào |
+| `order_items.order_id` | `orders.id` | hàng này thuộc đơn nào |
+| `order_items.product_id` | `products.id` | hàng này là sản phẩm nào |
+| `customers.referred_by` | `customers.id` | khách này do ai giới thiệu |
+
+Cách viết `orders.customer_id` (tên bảng, dấu chấm, tên cột) nói rõ cột thuộc bảng nào; bài 16 sẽ dùng cách viết này trong câu lệnh.
+
+### Một–nhiều
+
+Quan hệ giữa `customers` và `orders` là **một–nhiều** (one-to-many): một khách có thể có nhiều đơn, nhưng mỗi đơn chỉ thuộc đúng một khách. Phía "nhiều" (`orders`) giữ khóa ngoại, vì mỗi đơn chỉ cần ghi một mã khách. Nếu làm ngược lại, bảng `customers` phải có chỗ ghi danh sách đơn của mỗi khách, mà số đơn thì không cố định.
+
+<Playground>
+```sql
+SELECT id,
+       ordered_on,
+       status
+FROM orders
+WHERE customer_id = 5;
+```
+</Playground>
+
+Khách 5 (Võ Thanh Tâm) có 2 đơn: đơn 8 đặt ngày 2025-07-19 đã giao, và đơn 19 đặt ngày 2025-11-14 đang giao. Cả hai hàng đều ghi `customer_id` là 5. Đây là phía "nhiều" của quan hệ, và cũng là lý do `GROUP BY customer_id` ở bài 13 đếm được số đơn mỗi khách. Khách 8, 10, 12 thì ở phía "một" mà không có hàng nào bên phía "nhiều": họ chưa đặt đơn.
+
+Cột `referred_by` cũng tạo quan hệ một–nhiều, nhưng **trong cùng một bảng**: một khách có thể giới thiệu nhiều khách khác. Chị Hà (mã 1) giới thiệu 3 người, và `referred_by` của cả 3 người đó đều là 1. Quan hệ này gọi là tự tham chiếu (self-reference). Nó cho phép đi theo chuỗi: khách 9 do khách 6 giới thiệu, khách 6 lại do khách 1 giới thiệu. Năm khách tự tìm đến có `referred_by` là NULL: khóa ngoại NULL nghĩa là "không trỏ tới ai", và database chấp nhận. Còn `orders.customer_id` được khai báo không được NULL, vì đơn nào cũng phải có chủ.
+
+### Nhiều–nhiều qua bảng trung gian
+
+Giữa `orders` và `products` thì sao? Một đơn có nhiều sản phẩm, và một sản phẩm nằm trong nhiều đơn. Đây là quan hệ **nhiều–nhiều** (many-to-many). Không thể đặt khóa ngoại ở bên nào: đơn không thể ghi một `product_id` duy nhất, sản phẩm cũng không thể ghi một `order_id` duy nhất.
+
+Cách giải là thêm một **bảng trung gian** (junction table) đứng giữa: `order_items`. Mỗi hàng của nó nối một đơn với một sản phẩm. Quan hệ nhiều–nhiều được tách thành hai quan hệ một–nhiều: một đơn có nhiều hàng trong `order_items`, một sản phẩm cũng có nhiều hàng trong `order_items`.
+
+<Playground>
+```sql
+SELECT order_id,
+       product_id,
+       quantity,
+       unit_price
+FROM order_items
+WHERE order_id = 5
+   OR product_id = 2
+ORDER BY order_id, product_id;
+```
+</Playground>
+
+Kết quả có 7 hàng, nhìn từ hai phía. Theo **đơn**: đơn 5 có 3 hàng, nối với 3 sản phẩm (mã 2, 5, 8). Theo **sản phẩm**: Robusta (mã 2) có 5 hàng, nằm trong 5 đơn (1, 5, 7, 13, 19). Hàng (5, 2) thuộc cả hai phía: Robusta nằm trong đơn 5. Bảng trung gian còn là chỗ tự nhiên để ghi thông tin thuộc về **cặp** đơn–sản phẩm: số lượng (`quantity`) và giá lúc bán (`unit_price`). Robusta có giá 110000 ở đơn 1 và 5 nhưng 120000 ở các đơn sau; giá đó không thuộc riêng đơn, cũng không thuộc riêng sản phẩm, mà thuộc về lần bán cụ thể ấy.
+
+Ngoài hai loại trên còn có quan hệ **một–một** (one-to-one): mỗi hàng bên này khớp tối đa một hàng bên kia, ví dụ mỗi khách có một hồ sơ chi tiết riêng. Dataset cửa hàng không có quan hệ này; nó ít gặp hơn hai loại trên.
+
+## Vì sao tách dữ liệu ra nhiều bảng?
+
+Hãy thử hình dung thiết kế "tiện" mà câu hỏi ở đầu bài gợi ý: bảng `orders` ghi luôn tên và thành phố của khách.
+
+| id | customer_name | customer_city | ordered_on |
+|---|---|---|---|
+| 1 | Nguyễn Thu Hà | Hà Nội | 2025-03-02 |
+| 3 | Nguyễn Thu Hà | Hà Nội | 2025-04-15 |
+| 11 | Nguyễn Thu Hà | Hà Nội | 2025-09-10 |
+| 18 | Nguyễn Thu Hà | Hà Nội | 2025-11-12 |
+
+(Đây là bảng minh họa, không có trong dataset.) Đọc thì tiện, nhưng có ba vấn đề:
+
+- **Lặp lại**: tên và thành phố của chị Hà được chép 4 lần. Số lần chép tăng theo số đơn, tốn chỗ vô ích.
+- **Sửa thiếu chỗ**: chị Hà chuyển vào TP.HCM, bạn phải sửa cả 4 hàng. Sót một hàng là database tự mâu thuẫn: cùng một người mà hai thành phố.
+- **Không có chỗ cho thông tin độc lập**: khách mới đăng ký chưa đặt đơn (như khách 8, 10, 12) thì không có hàng nào để ghi tên họ.
+
+Khi tách bảng, mỗi sự thật được ghi **đúng một lần**: tên và thành phố của chị Hà nằm ở một hàng trong `customers`; các đơn chỉ ghi mã 1. Đổi thành phố thì sửa một chỗ, mọi đơn tự động "thấy" thành phố mới qua khóa ngoại. Cái giá phải trả là khi đọc, bạn phải nối các bảng lại, và đó chính là việc của `JOIN`. Bài 29 về chuẩn hóa (normalization) sẽ đi sâu vào các quy tắc thiết kế bảng.
+
+<Callout type="note" title="Có phải unit_price là lặp lại?">
+`order_items.unit_price` trông như chép lại `products.price`, nhưng không phải. Giá trong `products` là giá **hiện tại** và sẽ thay đổi; `unit_price` ghi lại giá **lúc bán**, một sự thật của quá khứ không được đổi theo. Đó là hai thông tin khác nhau, nên lưu cả hai là đúng.
+</Callout>
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Nhầm id của bảng này với mã của bảng khác">
+"Tìm các đơn của khách 5" mà viết `SELECT … FROM orders WHERE id = 5` sẽ ra **đơn số 5** (đặt ngày 2025-05-08), không phải các đơn của khách 5. Trong bảng `orders`, `id` là mã **đơn**; mã khách là `customer_id`. Câu sai không báo lỗi và vẫn trả về một hàng hợp lý, nên rất khó phát hiện. Trước khi viết điều kiện (condition), hãy tự hỏi: con số này là mã của cái gì, và cột nào chứa nó?
+</Callout>
+
+<Callout type="warn" title="Coi cột có giá trị không trùng là khóa chính">
+`name` trong `customers` hiện không trùng, nhưng không phải khóa chính. Dựa vào nó để định danh khách (ví dụ tra đơn theo tên) sẽ sai ngay khi có hai khách trùng tên. Luôn định danh bằng khóa chính.
+</Callout>
+
+<Callout type="warn" title="Quên rằng khóa chính có thể gồm nhiều cột">
+Trong `order_items`, `WHERE order_id = 5` trả về **3 hàng**, không phải 1. Muốn chỉ đúng một hàng, phải cho đủ cả cặp: `WHERE order_id = 5 AND product_id = 8`.
+</Callout>
+
+## Tóm tắt
+
+- Khóa chính xác định duy nhất mỗi hàng: không trùng, không NULL. Thường là một mã số tự đặt (`id`), vì thông tin thật như tên có thể trùng, đổi hoặc thiếu.
+- Khóa chính có thể gồm nhiều cột (khóa ghép): `order_items` định danh bằng cặp `(order_id, product_id)`.
+- Khóa ngoại là cột có giá trị trỏ tới khóa chính của một bảng (có thể chính bảng đó, như `referred_by`), hoặc NULL nếu cột cho phép. Database từ chối dữ liệu làm khóa ngoại trỏ vào hàng không tồn tại (SQLite chỉ khi đã bật kiểm tra).
+- Một–nhiều: phía "nhiều" giữ khóa ngoại (`orders.customer_id`). Nhiều–nhiều: tách thành hai quan hệ một–nhiều qua bảng trung gian (`order_items`), nơi cũng chứa thông tin của từng cặp.
+- Tách bảng để mỗi sự thật chỉ ghi một lần: tránh lặp, tránh sửa thiếu chỗ, có chỗ cho thông tin độc lập. Đổi lại, khi đọc phải nối bảng.
+
+## Bài tập
+
+<Exercise hint="Cột nào trong bảng customers cho biết ai đã giới thiệu khách?">
+Liệt kê những khách được giới thiệu bởi **khách mã 1 hoặc khách mã 6**. Kết quả gồm 3 cột theo thứ tự: `id`, `name`, `city`.
+
+```sql
+SELECT id,
+       name,
+       city
+FROM customers
+WHERE referred_by IN (1, 6);
+```
+</Exercise>
+
+<Exercise hint="Mỗi hàng của order_items là một sản phẩm trong một đơn. Cột nào chứa mã sản phẩm?">
+Bánh đậu xanh Hải Dương (sản phẩm mã 9) đã nằm trong những đơn nào, mỗi đơn mấy hộp? Kết quả gồm 2 cột theo thứ tự: mã đơn, số lượng.
+
+```sql
+SELECT order_id, quantity
+FROM order_items
+WHERE product_id = 9;
+```
+</Exercise>
+
+<Exercise hint="Trong order_items có hai cột mã. Đề hỏi theo đơn hay theo sản phẩm?" starter={"SELECT product_id, quantity\nFROM order_items\nWHERE product_id = 7;\n"}>
+Câu lệnh có sẵn trong ô muốn liệt kê **các sản phẩm trong đơn số 7** kèm số lượng, nhưng lại cho kết quả của một câu hỏi khác. Hãy sửa cho đúng, giữ nguyên 2 cột.
+
+```sql
+SELECT product_id, quantity
+FROM order_items
+WHERE order_id = 7;
+```
+</Exercise>
+
+<Exercise hint="Mỗi khách giới thiệu là một giá trị của referred_by. Khách tự tìm đến có referred_by là NULL.">
+Mỗi người đã giới thiệu được bao nhiêu khách? Chỉ tính những khách **có** người giới thiệu. Kết quả gồm 2 cột theo thứ tự: mã người giới thiệu, số khách được giới thiệu; sắp theo mã người giới thiệu tăng dần.
+
+```sql
+SELECT referred_by,
+       COUNT(*) AS so_khach
+FROM customers
+WHERE referred_by IS NOT NULL
+GROUP BY referred_by
+ORDER BY referred_by;
+```
+</Exercise>
+
+<Exercise hint="Đếm số hàng của order_items theo từng đơn, rồi lọc nhóm (bài 14).">
+Đơn nào có **từ 3 sản phẩm khác nhau trở lên**? Kết quả gồm 2 cột theo thứ tự: mã đơn, số sản phẩm; sắp theo mã đơn tăng dần.
+
+```sql
+SELECT order_id,
+       COUNT(*) AS so_san_pham
+FROM order_items
+GROUP BY order_id
+HAVING COUNT(*) >= 3
+ORDER BY order_id;
+```
+</Exercise>
+
+Bạn đã thấy đi theo khóa ngoại bằng tay mất hai câu truy vấn và một lần chép số. Bài tiếp theo giới thiệu `INNER JOIN`: nối `orders` với `customers` theo `customer_id = id` trong một câu lệnh, để mỗi đơn hiện luôn tên khách.

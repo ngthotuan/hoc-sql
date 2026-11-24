@@ -1,0 +1,42 @@
+---
+// Bài tập tự chấm. Dùng trong MDX:
+//
+//   <Exercise hint="Dùng WHERE với cột city.">
+//   Liệt kê tên các khách hàng ở Hà Nội.
+//
+//   ```sql
+//   SELECT name
+//   FROM customers
+//   WHERE city = 'Hà Nội';
+//   ```
+//   </Exercise>
+//
+// Phần chữ là đề bài; khối ```sql CUỐI CÙNG là lời giải mẫu (ẩn với người học tới khi họ bấm xem).
+// Chấm bằng cách so KẾT QUẢ của câu người học với kết quả của lời giải, không so chữ.
+// Thứ tự hàng chỉ bị kiểm tra khi lời giải có ORDER BY ở cấp ngoài cùng.
+import Island from './Exercise.tsx';
+import type { EngineId } from '../data/tracks';
+import { splitLastCode } from '../lib/code-from-html';
+
+interface Props {
+  engine?: EngineId;
+  dataset?: string;
+  hint?: string;
+  /** Câu SQL có sẵn trong ô khi người học bắt đầu (mặc định: một dòng chú thích) */
+  starter?: string;
+}
+const { engine = 'sqlite', dataset = 'shop', hint, starter = '-- Viết câu truy vấn của bạn ở đây\n' } = Astro.props;
+
+const html = Astro.slots.has('default') ? await Astro.slots.render('default') : '';
+const { before: prompt, code: solution } = splitLastCode(html);
+if (!solution) {
+  throw new Error(`<Exercise> trong ${Astro.url.pathname} thiếu lời giải: đặt một khối \`\`\`sql ở cuối.`);
+}
+// Định danh ổn định để nhớ bài đã giải (theo trang + lời giải)
+const key = Astro.url.pathname + '#' + [...solution].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36);
+---
+
+<section class="ex" aria-label="Bài tập">
+  <div class="ex-prompt" set:html={prompt} />
+  <Island client:visible engine={engine} dataset={dataset} solution={solution} hint={hint} starter={starter} storageKey={key} />
+</section>

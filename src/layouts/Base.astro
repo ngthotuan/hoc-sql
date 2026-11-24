@@ -1,0 +1,112 @@
+---
+import '../styles/global.css';
+import ThemeSwitch from '../components/ThemeSwitch.astro';
+import { tracks } from '../data/tracks';
+import { withBase } from '../lib/url';
+
+interface Props {
+  title: string;
+  description?: string;
+  current?: string;
+}
+const {
+  title,
+  description = 'Học SQL từ đầu, rồi đi sâu vào PostgreSQL và MySQL. Viết và chạy SQL ngay trên trình duyệt.',
+  current,
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#f1f4f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#10161f" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href={withBase("/favicon.svg")} type="image/svg+xml" />
+    <title>{title}</title>
+    <!-- Đặt giao diện trước khi vẽ trang để không bị nháy màu -->
+    <script is:inline>
+      try {
+        var t = localStorage.getItem('theme');
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+        if (localStorage.getItem('toc') === 'hidden') document.documentElement.dataset.toc = 'hidden';
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Bỏ qua, tới nội dung</a>
+    <header class="site-head">
+      <div class="wrap head-inner">
+        <a class="brand" href={withBase("/")}>Học SQL<span aria-hidden="true">;</span></a>
+        <nav class="site-nav" aria-label="Lộ trình">
+          {tracks.map((t) => (
+            <a href={withBase(`/${t.id}/`)} aria-current={current === t.id ? 'page' : undefined} data-astro-prefetch>
+              {t.name}
+            </a>
+          ))}
+        </nav>
+        <ThemeSwitch />
+      </div>
+    </header>
+    <div class="page">
+      <slot />
+    </div>
+    <footer class="site-foot">
+      <div class="wrap">
+        <p>Các ô thực hành chạy SQLite và PostgreSQL ngay trong trình duyệt của bạn. Dữ liệu bạn sửa chỉ nằm trên máy bạn.</p>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style>
+  .site-head { border-bottom: 1px solid var(--rule); background: var(--paper); }
+  .head-inner {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: var(--space-3) var(--space-6);
+    padding-block: var(--space-3);
+  }
+  .brand {
+    font-weight: 700;
+    font-size: var(--step-1);
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .brand span { font-family: var(--font-code); font-weight: 500; color: var(--ink-soft); }
+  .site-nav {
+    display: flex;
+    gap: var(--space-1);
+    font-size: var(--step--1);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .site-nav a {
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-s);
+    text-decoration: none;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  .site-nav a:hover { color: var(--ink); background: var(--surface); }
+
+  .page { flex: 1; }
+
+  .site-foot {
+    border-top: 1px solid var(--rule);
+    padding-block: var(--space-5);
+    font-size: var(--step--1);
+    color: var(--ink-soft);
+  }
+  .site-foot p { margin: 0; max-width: 60ch; }
+
+  /* Điện thoại: logo + nút giao diện ở hàng trên, lộ trình cuộn ngang ở hàng dưới */
+  @media (max-width: 720px) {
+    .head-inner { grid-template-columns: 1fr auto; }
+    .site-nav { grid-column: 1 / -1; grid-row: 2; margin-inline: calc(var(--space-2) * -1); }
+  }
+</style>
