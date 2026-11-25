@@ -329,7 +329,8 @@
         "INNER JOIN",
         "ON"
       ],
-      "status": "planned"
+      "status": "done",
+      "recap": "Người học nối hai bảng bằng FROM A INNER JOIN B ON điều_kiện (thường khóa ngoại = khóa chính, o.customer_id = c.id; JOIN một mình = INNER JOIN), đặt bí danh bảng bằng AS (orders AS o) và ghi tiền tố cho mọi cột (cột trùng tên không tiền tố → lỗi ambiguous; đã đặt bí danh thì không dùng tên bảng gốc). Hiểu INNER JOIN chỉ giữ cặp khớp: hàng không có cặp biến mất (khách 8, 10, 12; Hải Phòng), hàng có nhiều cặp được nhân lên (chị Hà 4 đơn → 4 hàng). FROM và JOIN chạy đầu tiên, sau đó WHERE/GROUP BY… dùng được cột của cả hai bảng (đếm đơn theo thành phố, doanh thu theo danh mục, so unit_price với price). Ý nghĩa: mọi cặp (20×12=240) giữ cặp khớp; thực thi bằng tra khóa chính (SQLite) hoặc bảng băm (PostgreSQL). Lỗi: ON sai cột chạy im lặng (o.id = c.id ra 12 hàng sai); quên ON thì SQLite ghép mọi cặp, PostgreSQL lỗi cú pháp."
     },
     {
       "id": "basics/17-outer-join",
@@ -348,7 +349,8 @@
         "FULL JOIN",
         "OUTER"
       ],
-      "status": "planned"
+      "status": "done",
+      "recap": "Người học dùng A LEFT JOIN B ON … để giữ mọi hàng của bảng bên trái (bảng muốn giữ đủ đứng trước), hàng không có cặp được giữ một lần với NULL ở cột bên phải; LEFT OUTER JOIN = LEFT JOIN. Tìm hàng không có cặp bằng WHERE b.khóa_chính IS NULL (khách 8, 10, 12; sản phẩm 12), không kiểm cột có NULL sẵn. Đếm cả số 0 bằng LEFT JOIN + GROUP BY + COUNT(b.khóa) (COUNT(*) ra 1), COALESCE(SUM(…), 0). Nắm bẫy: điều kiện trên bảng bên phải đặt trong WHERE biến LEFT JOIN thành INNER JOIN (khách 11 có đơn đang giao cũng mất) → đặt trong ON … AND; điều kiện trên bảng bên trái đặt trong ON không loại hàng nào (TP.HCM: 10 khách thay vì 1) → đặt trong WHERE. Biết RIGHT JOIN là LEFT JOIN đổi chiều (khóa học chỉ dùng LEFT), FULL JOIN giữ cả hai bên (MySQL không có, hẹn UNION ở bài 21); SQLite có RIGHT/FULL từ 3.39. LEFT JOIN tạo NULL nên mọi bước sau phải xử lý NULL."
     },
     {
       "id": "basics/18-join-nhieu-bang",
@@ -364,7 +366,8 @@
       "introduces": [
         "CROSS JOIN"
       ],
-      "status": "planned"
+      "status": "done",
+      "recap": "Người học nối 3–4 bảng bằng chuỗi JOIN … ON (mỗi ON đi theo một khóa ngoại, nối bảng mới với một bảng đã có; chỉ nối bảng cần thiết), rồi dùng WHERE/GROUP BY/HAVING/ORDER BY trên bảng đã ghép (tổng chi theo khách, doanh thu theo thành phố). Biết tự nối (self join): cùng bảng hai bí danh theo vai trò (customers AS k / AS g cho người giới thiệu; LEFT JOIN để giữ khách tự tìm đến); bí danh trùng thì PostgreSQL lỗi ngay, SQLite chỉ lỗi khi dùng cột. CROSS JOIN ghép mọi cặp (tích số hàng) có chủ đích (combo cà phê + dụng cụ). Nhận ra hàng bị nhân bản: nối qua phía nhiều làm COUNT(*) đếm hàng chi tiết (Hà 4 đơn, 7 hàng), hai nhánh nhiều độc lập nhân nhau (4 đơn × 3 người = 12); COUNT(DISTINCT) cứu được phép đếm, không cứu được SUM (hẹn bài 19/22). Thứ tự xử lý là logic; database được phép lọc trước, đổi thứ tự INNER JOIN (query optimizer, hẹn bài 31)."
     },
     {
       "id": "basics/19-truy-van-con",
@@ -377,7 +380,8 @@
         "Dùng truy vấn con trong FROM như một bảng tạm"
       ],
       "introduces": [],
-      "status": "planned"
+      "status": "done",
+      "recap": "Người học viết truy vấn con (subquery): câu SELECT trong ngoặc, chạy trước rồi dùng kết quả trong truy vấn chính. Vô hướng (1 hàng 1 cột) dùng như một giá trị trong WHERE/SELECT (price > (SELECT AVG(price) …) giải bài toán của bài 12; chênh lệch so với trung bình cả bảng); phải chắc chỉ một hàng (dùng hàm tổng hợp hoặc lọc theo khóa chính), vì SQLite lặng lẽ lấy một hàng (bánh đậu xanh 'rẻ hơn chính nó') còn PostgreSQL/MySQL lỗi. Danh sách (1 cột nhiều hàng) dùng với IN/NOT IN; IN không nhân bản hàng như JOIN (mỗi khách một lần); IN nhiều cột lỗi. Bảng tạm trong FROM có bí danh (AS t) để gom hai lần (số khách theo số đơn) và để tính riêng từng nhánh rồi LEFT JOIN + COALESCE (sửa lỗi nhân bản của bài 18, đúng cả với SUM). Truy vấn con không tương quan chạy một lần; hẹn truy vấn con tương quan và bẫy NOT IN với NULL ở bài 20, CTE ở bài 22."
     },
     {
       "id": "basics/20-exists",
@@ -392,7 +396,8 @@
       "introduces": [
         "EXISTS"
       ],
-      "status": "planned"
+      "status": "done",
+      "recap": "Người học viết truy vấn con tương quan (correlated subquery) nhắc tới cột của hàng đang xét bên ngoài (p2.category = p.category, hai bí danh khác nhau cho hai vai của cùng bảng), trong WHERE (sản phẩm đắt hơn trung bình danh mục; rẻ/đắt nhất trong danh mục) và trong SELECT (đơn gần nhất của mỗi khách, NULL khi chưa có đơn). Dùng EXISTS (đúng khi truy vấn con có ít nhất một hàng; quy ước SELECT 1; không nhân bản hàng) và NOT EXISTS (tìm hàng không có cặp, tương đương LEFT JOIN … IS NULL của bài 17). Hiểu bẫy NOT IN khi danh sách có NULL: x NOT IN (…, NULL) không bao giờ đúng nên WHERE loại mọi hàng (khách chưa giới thiệu ai: 0 hàng vì referred_by có NULL); sửa bằng lọc IS NOT NULL hoặc dùng NOT EXISTS. Quên điều kiện tương quan làm EXISTS giữ tất cả. Biết PostgreSQL viết lại EXISTS thành semi/anti join, SQLite tùy câu (index tạm hoặc chạy truy vấn con từng hàng, dừng ở hàng đầu tiên)."
     },
     {
       "id": "basics/21-phep-tap-hop",
@@ -410,7 +415,8 @@
         "INTERSECT",
         "EXCEPT"
       ],
-      "status": "planned"
+      "status": "planned",
+      "notes": "Bài 17 đã hẹn: thay FULL JOIN trên MySQL bằng LEFT JOIN hai chiều ghép bằng UNION."
     },
     {
       "id": "basics/22-cte",

@@ -1,0 +1,288 @@
+---
+title: LEFT, RIGHT và FULL JOIN
+description: Giữ lại cả những hàng không có cặp bằng LEFT JOIN, dùng nó để tìm khách chưa mua gì và đếm cả số 0, tránh bẫy đặt điều kiện vào WHERE, và biết RIGHT JOIN, FULL JOIN.
+order: 17
+---
+
+Bài 16 cho thấy `INNER JOIN` lặng lẽ bỏ đi những hàng (row) không có cặp: nối bảng (table) `customers` với `orders` thì Hoàng Mai Anh, Lý Kim Chi, Dương Hải Yến biến mất, vì họ chưa đặt đơn nào. Đếm đơn theo thành phố thì Hải Phòng không có trong kết quả (result set), thay vì hiện số 0.
+
+Nhưng nhiều câu hỏi lại cần chính những hàng đó: khách nào đã đăng ký mà chưa mua gì, để gửi mã giảm giá? Sản phẩm nào chưa bán được cái nào? Mỗi khách đặt bao nhiêu đơn, **kể cả** người chưa đặt? Bài này giới thiệu các kiểu nối ngoài (outer join), giữ lại hàng không có cặp và điền NULL vào chỗ trống.
+
+## LEFT JOIN: giữ mọi hàng của bảng bên trái
+
+`LEFT JOIN` viết giống hệt `INNER JOIN`, chỉ khác từ khóa (keyword):
+
+<Playground>
+```sql
+SELECT c.id AS ma_khach,
+       c.name,
+       o.id AS ma_don,
+       o.ordered_on
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.id
+WHERE c.id IN (1, 8, 10)
+ORDER BY c.id, o.id;
+```
+</Playground>
+
+Kết quả có 6 hàng. Bốn hàng đầu là chị Hà với 4 đơn, giống hệt bài 16. Khác biệt nằm ở hai hàng cuối: Hoàng Mai Anh (khách 8) và Lý Kim Chi (khách 10) **vẫn có mặt**, mỗi người một hàng, và các cột (column) lấy từ `orders` (`ma_don`, `ordered_on`) đều là **NULL**.
+
+Quy tắc của `A LEFT JOIN B ON …`, với điều kiện (condition) ghép cặp nằm sau `ON`:
+
+- Bảng viết **trước** `LEFT JOIN` (ở đây `customers`) là bảng **bên trái**; bảng viết sau là bảng **bên phải**.
+- Hàng bên trái có cặp: ghép như `INNER JOIN`, một hàng kết quả cho mỗi cặp.
+- Hàng bên trái **không có cặp**: vẫn được giữ, đúng **một** hàng, và mọi cột của bảng bên phải là NULL.
+- Hàng bên phải không có cặp: bị bỏ, như `INNER JOIN`.
+
+NULL ở đây mang đúng nghĩa của bài 7: "không có". Khách 8 không có đơn nào, nên không có mã đơn, không có ngày đặt. Tên đầy đủ của kiểu nối này là `LEFT OUTER JOIN`; chữ `OUTER` (ngoài) có thể bỏ và khóa học viết gọn là `LEFT JOIN`.
+
+<Callout type="try">
+Đổi `LEFT JOIN` thành `INNER JOIN` rồi chạy lại: còn 4 hàng, hai khách 8 và 10 biến mất. Đổi lại `LEFT JOIN` và bỏ dòng `WHERE`: được 23 hàng, gồm 20 đơn cộng 3 khách chưa có đơn.
+</Callout>
+
+### Thứ tự hai bảng quan trọng
+
+Với `INNER JOIN`, viết `customers INNER JOIN orders` hay `orders INNER JOIN customers` đều cho cùng các hàng. Với `LEFT JOIN` thì không: bảng bên trái là bảng được **giữ đủ**. `orders LEFT JOIN customers` giữ đủ các đơn, mà đơn nào cũng có khách (cột `customer_id` không được NULL và là khóa ngoại (foreign key) trỏ tới `customers`, bài 15), nên nó cho đúng 20 hàng như `INNER JOIN`, và ba khách chưa có đơn vẫn không xuất hiện. Hãy tự hỏi: **bảng nào tôi muốn giữ đủ?** Bảng đó viết bên trái.
+
+## Tìm hàng không có cặp
+
+Hàng bên trái không có cặp thì mọi cột bên phải là NULL. Lọc đúng những hàng đó bằng `IS NULL` (bài 7), ta tìm được "khách chưa có đơn":
+
+<Playground>
+```sql
+SELECT c.id, c.name
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.id
+WHERE o.id IS NULL;
+```
+</Playground>
+
+Ba khách: Hoàng Mai Anh (8), Lý Kim Chi (10), Dương Hải Yến (12). Bài 13 đã nhắc tới đúng ba người này khi `GROUP BY customer_id` trên `orders` chỉ ra 9 nhóm. Giờ ta liệt kê được họ. Cùng cách đó, `products LEFT JOIN order_items` rồi lọc `IS NULL` sẽ tìm ra sản phẩm chưa bán được cái nào (bạn sẽ tự viết ở phần bài tập).
+
+Vì sao kiểm tra `o.id`? Vì `o.id` là khóa chính (primary key) của `orders`, nên với mọi hàng **có cặp**, nó chắc chắn không NULL. Nó chỉ NULL khi hàng đó do `LEFT JOIN` điền vào. Nếu kiểm tra một cột có thể NULL sẵn, như `o.shipped_on`, bạn sẽ lẫn cả những khách có đơn chưa gửi. Quy tắc: để tìm hàng không có cặp, kiểm tra **khóa chính** hoặc cột dùng trong `ON` của bảng bên phải.
+
+Cách viết này (LEFT JOIN rồi lọc `IS NULL`) đôi khi được gọi là anti-join: lấy những hàng bên trái **không** khớp với bên phải. Bài 20 sẽ giới thiệu một cách viết khác cho cùng câu hỏi (`NOT EXISTS`).
+
+## Đếm cả số 0
+
+Kết hợp `LEFT JOIN` với `GROUP BY` (bài 13) để đếm số đơn của mỗi khách, kể cả người chưa đặt. Có một chi tiết quan trọng về hàm tổng hợp (aggregate function) `COUNT`:
+
+<Playground>
+```sql
+SELECT c.id,
+       c.name,
+       COUNT(o.id) AS so_don,
+       COUNT(*) AS dem_hang
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.id
+GROUP BY c.id, c.name
+ORDER BY c.id;
+```
+</Playground>
+
+Đủ 12 khách. Cột `so_don` đúng: chị Hà 4, khách 2 và 6 mỗi người 3, và ba khách 8, 10, 12 là **0**. Cột `dem_hang` thì sai ở đúng ba khách đó: nó ghi **1**. Lý do nằm ở bài 12: `COUNT(*)` đếm **hàng**, mà `LEFT JOIN` đã tạo cho mỗi khách chưa có đơn một hàng (với các cột bên phải là NULL). Còn `COUNT(o.id)` đếm giá trị **không NULL**, nên hàng điền NULL không được tính.
+
+Quy tắc: sau `LEFT JOIN`, muốn đếm số hàng khớp bên phải thì dùng `COUNT(cột của bảng bên phải)`, thường là khóa chính của nó, không dùng `COUNT(*)`. `GROUP BY c.id, c.name` gom theo cả mã và tên: mã bảo đảm hai khách trùng tên không bị gộp, tên để hiện trong `SELECT` (bài 13).
+
+## Bẫy: điều kiện trong WHERE biến LEFT JOIN thành INNER JOIN
+
+Câu hỏi: mỗi khách có bao nhiêu đơn **đã giao**, kể cả 0? Phản xạ tự nhiên là thêm `WHERE o.status = 'đã giao'`. Ô dưới đây so sánh cách đó với cách đúng:
+
+<Playground>
+```sql
+-- Sai: điều kiện trong WHERE
+SELECT c.id,
+       c.name,
+       COUNT(o.id) AS so_don_da_giao
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.id
+WHERE o.status = 'đã giao'
+GROUP BY c.id, c.name
+ORDER BY c.id;
+
+-- Đúng: điều kiện trong ON
+SELECT c.id,
+       c.name,
+       COUNT(o.id) AS so_don_da_giao
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.id
+ AND o.status = 'đã giao'
+GROUP BY c.id, c.name
+ORDER BY c.id;
+```
+</Playground>
+
+Bảng đầu chỉ có **8** khách, và không có số 0 nào: khách 8, 10, 11, 12 đã biến mất. Bảng sau có đủ **12** khách, bốn người đó có `so_don_da_giao` bằng 0. Khách 11 (Trịnh Quang Vinh) đáng chú ý: anh **có** đơn (đơn 15), nhưng đơn đó đang giao chứ chưa giao xong.
+
+Vì sao? Nhớ thứ tự xử lý ở bài 16: `FROM` và `JOIN` chạy trước, `WHERE` chạy sau.
+
+- **Cách sai**: `LEFT JOIN` tạo đủ hàng, kể cả hàng điền NULL cho khách 8, 10, 12. Rồi `WHERE o.status = 'đã giao'` lọc: hàng điền NULL có `o.status` là NULL, so sánh ra "không xác định" (bài 7) nên bị loại. Đơn 15 của khách 11 có trạng thái `đang giao`, cũng bị loại, và khách 11 không còn hàng nào. Kết quả giống hệt `INNER JOIN`: công sức của `LEFT JOIN` bị xóa sạch.
+- **Cách đúng**: điều kiện trạng thái nằm trong `ON`, tức là một phần của **định nghĩa cặp khớp**: "ghép khách với những đơn **đã giao** của họ". Khách không có đơn nào như vậy (8, 10, 11, 12) là hàng không có cặp, và `LEFT JOIN` vẫn giữ họ với NULL.
+
+Quy tắc dễ nhớ với `LEFT JOIN`: điều kiện trên **bảng bên phải** đặt trong `ON`; điều kiện trên **bảng bên trái** (như `c.city = 'Hà Nội'`) đặt trong `WHERE`. Ngoại lệ hay gặp là `WHERE bên_phải.khóa IS NULL` để tìm hàng không có cặp, như phần trên. Với `INNER JOIN` thì đặt ở `ON` hay `WHERE` đều cho cùng kết quả, vì nó không giữ hàng không có cặp.
+
+Vì sao điều kiện trên bảng bên trái lại phải nằm trong `WHERE`? Vì `ON` chỉ quyết định **cặp nào khớp**; nó không bao giờ loại một hàng nào của bảng bên trái, `LEFT JOIN` vẫn giữ đủ. Viết `ON o.customer_id = c.id AND c.city = 'TP.HCM'` thì cả 12 khách vẫn được giữ; chỉ là mọi khách ngoài TP.HCM bị coi là "không có cặp" và mang NULL ở các cột của `orders`. Thêm `WHERE o.id IS NULL` để tìm khách TP.HCM chưa có đơn, bạn sẽ nhận về **10** khách (9 khách ngoài TP.HCM cùng Lý Kim Chi) thay vì đúng 1 người. Muốn **bỏ** hàng của bảng bên trái thì phải dùng `WHERE`.
+
+<Callout type="try">
+Trong câu "Đúng" ở ô trên, thêm ` AND c.city = 'TP.HCM'` vào sau điều kiện `ON`, thay toàn bộ phần `GROUP BY … ORDER BY` bằng `WHERE o.id IS NULL;` và chỉ giữ hai cột `c.id, c.name`. Bạn sẽ thấy 10 khách thay vì 1.
+</Callout>
+
+Về trình bày: điều kiện nối thêm của `ON` xuống dòng với ` AND`, canh thẳng mép phải với `ON`, giống `AND` dưới `WHERE` ở bài 5.
+
+## RIGHT JOIN và FULL JOIN
+
+`RIGHT JOIN` là `LEFT JOIN` nhìn từ phía bên kia: giữ đủ hàng của bảng **bên phải**. `orders RIGHT JOIN customers` cho cùng kết quả với `customers LEFT JOIN orders`, chỉ khác thứ tự cột nếu dùng `SELECT *`. Ô dưới đây chạy cả hai cách:
+
+<Playground>
+```sql
+-- RIGHT JOIN: giữ đủ bảng bên phải (customers)
+SELECT c.name,
+       o.id AS ma_don
+FROM orders AS o
+RIGHT JOIN customers AS c
+  ON o.customer_id = c.id
+WHERE o.id IS NULL;
+
+-- Cùng câu hỏi, viết bằng LEFT OUTER JOIN và đổi chỗ hai bảng
+SELECT c.name,
+       o.id AS ma_don
+FROM customers AS c
+LEFT OUTER JOIN orders AS o
+  ON o.customer_id = c.id
+WHERE o.id IS NULL;
+```
+</Playground>
+
+Hai câu lệnh (statement) cho cùng ba khách chưa có đơn (thứ tự hàng có thể khác, vì không có `ORDER BY`). Câu sau cũng cho thấy `LEFT OUTER JOIN` chính là `LEFT JOIN` viết đủ. Vì luôn viết lại được thành `LEFT JOIN` bằng cách đổi chỗ hai bảng, nhiều người (và khóa học này) chỉ dùng `LEFT JOIN` để câu lệnh nhất quán: bảng được giữ đủ luôn đứng đầu.
+
+`FULL JOIN` (`FULL OUTER JOIN`) giữ **cả hai bên**: hàng có cặp được ghép, hàng không có cặp ở bên nào cũng được giữ, với NULL cho bên kia.
+
+<Playground>
+```sql
+SELECT c.name,
+       o.id AS ma_don
+FROM customers AS c
+FULL JOIN orders AS o
+  ON o.customer_id = c.id
+WHERE o.id IS NULL
+   OR c.id IS NULL;
+```
+</Playground>
+
+Ba hàng: ba khách chưa có đơn, với `ma_don` là NULL. Không có hàng nào có `name` là NULL, tức không có đơn nào thiếu khách: cột `customer_id` không được NULL, và khóa ngoại (bài 15) bảo đảm mã khách luôn có thật (với SQLite, nhờ ô thực hành đã bật kiểm tra khóa ngoại). Bỏ cả mệnh đề (clause) `WHERE` (hai dòng `WHERE … OR …`, nhớ giữ dấu `;`) thì `FULL JOIN` cho 23 hàng, bằng `LEFT JOIN`, cũng vì lý do đó. `FULL JOIN` có ích khi cả hai bảng đều có thể có hàng lẻ, ví dụ so khớp hai danh sách đến từ hai nguồn khác nhau.
+
+Không phải database nào cũng có đủ ba kiểu nối này: xem bảng ở phần sau.
+
+## Bên trong database: LEFT JOIN tạo NULL
+
+`INNER JOIN` không bao giờ tạo ra NULL mới: mọi giá trị trong kết quả đều có thật trong bảng. `LEFT JOIN` thì **tạo** NULL cho những hàng không có cặp. Hệ quả là mọi thứ phía sau (`WHERE`, `COUNT`, phép tính, so sánh) phải xử lý được NULL theo đúng các quy tắc ở bài 7 và bài 12. Ba cái bẫy liên quan tới NULL trong bài đều xuất phát từ đây: `COUNT(*)` đếm cả hàng NULL, `WHERE` loại hàng NULL, và `IS NULL` trên một cột có NULL sẵn cho kết quả lẫn lộn.
+
+Về cách thực hiện, database làm `LEFT JOIN` giống `INNER JOIN` (tra theo mã, hoặc dùng bảng băm (hash table) như bài 16 đã nói; bài 31 về index sẽ giải thích kỹ), thêm một bước: với mỗi hàng bên trái, nếu không dò được cặp nào thì vẫn xuất ra một hàng, điền NULL cho bên phải.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Điều kiện của bảng bên phải đặt trong WHERE">
+`LEFT JOIN orders AS o … WHERE o.status = 'đã giao'` loại mọi hàng điền NULL, và `LEFT JOIN` trở thành `INNER JOIN` mà không báo gì. Dấu hiệu: bạn mong có số 0 hoặc NULL nhưng kết quả không có. Chuyển điều kiện vào `ON … AND …`.
+</Callout>
+
+<Callout type="warn" title="COUNT(*) sau LEFT JOIN">
+Khách chưa có đơn vẫn có một hàng sau `LEFT JOIN`, nên `COUNT(*)` ra 1 thay vì 0. Đếm bằng `COUNT(o.id)`.
+</Callout>
+
+<Callout type="warn" title="Điều kiện của bảng bên trái đặt trong ON">
+`LEFT JOIN orders AS o ON o.customer_id = c.id AND c.city = 'Hà Nội'` **không** lọc khách theo thành phố: `ON` không bao giờ loại hàng bên trái, nên mọi khách vẫn còn, chỉ là khách ngoài Hà Nội thành "không có cặp". Điều kiện để giữ hoặc bỏ hàng của bảng bên trái đặt trong `WHERE`.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| `LEFT JOIN` | có | có | có |
+| `RIGHT JOIN` | có (từ bản 3.39, năm 2022) | có | có |
+| `FULL JOIN` | có (từ bản 3.39) | có | **không có** |
+
+SQLite cũ hơn bản 3.39 chỉ có `LEFT JOIN`; ô thực hành dùng bản mới nên chạy được cả ba. MySQL đến nay vẫn chưa có `FULL JOIN`. Bài 21 (`UNION`) sẽ cho thấy cách ghép hai `LEFT JOIN` ngược chiều để thay thế. Đây thêm một lý do để quen viết `LEFT JOIN`: nó chạy ở mọi nơi.
+
+## Tóm tắt
+
+- `A LEFT JOIN B ON …` giữ **mọi** hàng của A; hàng không có cặp được giữ một lần, với NULL ở mọi cột của B. Bảng muốn giữ đủ phải đứng bên trái.
+- Tìm hàng không có cặp: `LEFT JOIN` rồi `WHERE b.khóa_chính IS NULL` (khách chưa có đơn, sản phẩm chưa bán).
+- Đếm cả số 0: `LEFT JOIN` + `GROUP BY` + `COUNT(b.khóa_chính)`; `COUNT(*)` ra 1 cho hàng không có cặp.
+- Điều kiện trên bảng bên phải đặt trong `ON`; đặt trong `WHERE` sẽ loại hàng NULL và biến `LEFT JOIN` thành `INNER JOIN`.
+- `RIGHT JOIN` là `LEFT JOIN` đổi chiều (khóa học chỉ dùng `LEFT JOIN`); `FULL JOIN` giữ cả hai bên, MySQL không có.
+
+## Bài tập
+
+<Exercise hint="Bảng nào cần giữ đủ: sản phẩm hay các hàng của order_items? Rồi lọc hàng không có cặp.">
+Tìm những sản phẩm **chưa từng được đặt** trong đơn nào. Kết quả gồm 2 cột theo thứ tự: `id`, `name` của sản phẩm.
+
+```sql
+SELECT p.id, p.name
+FROM products AS p
+LEFT JOIN order_items AS oi
+  ON oi.product_id = p.id
+WHERE oi.product_id IS NULL;
+```
+</Exercise>
+
+<Exercise hint="Khách chưa có đơn ở Hà Nội: một điều kiện về khách (bảng bên trái), một điều kiện về việc không có cặp.">
+Có khách nào **ở Hà Nội** mà **chưa đặt đơn nào** không? Kết quả gồm 2 cột theo thứ tự: mã khách, tên khách.
+
+```sql
+SELECT c.id, c.name
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.id
+WHERE c.city = 'Hà Nội'
+  AND o.id IS NULL;
+```
+</Exercise>
+
+<Exercise hint="Câu có sẵn có hai lỗi: một lỗi làm mất khách, một lỗi đếm sai khách không có đơn nào. Xem lại phần bẫy WHERE và phần đếm cả số 0." starter={"SELECT c.id,\n       COUNT(*) AS so_don_cho\nFROM customers AS c\nLEFT JOIN orders AS o\n  ON o.customer_id = c.id\nWHERE o.status = 'chờ xác nhận'\nGROUP BY c.id;\n"}>
+Câu lệnh có sẵn trong ô muốn đếm **số đơn đang chờ xác nhận của mỗi khách, kể cả khách có 0 đơn như vậy**, nhưng chỉ ra vài khách. Hãy sửa cho đúng, giữ nguyên 2 cột.
+
+```sql
+SELECT c.id,
+       COUNT(o.id) AS so_don_cho
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.id
+ AND o.status = 'chờ xác nhận'
+GROUP BY c.id;
+```
+</Exercise>
+
+<Exercise hint="Bài 16 đã đếm đơn theo thành phố bằng INNER JOIN và thiếu một thành phố. Đi từ bảng nào để giữ đủ mọi thành phố? Đếm bằng cột nào?">
+Mỗi thành phố có bao nhiêu đơn (tính mọi trạng thái, kể cả đơn đã hủy), **kể cả thành phố chưa có đơn nào** (hiện 0)? Kết quả gồm 2 cột theo thứ tự: thành phố, số đơn; sắp theo số đơn giảm dần, cùng số đơn thì theo thành phố.
+
+```sql
+SELECT c.city,
+       COUNT(o.id) AS so_don
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.id
+GROUP BY c.city
+ORDER BY so_don DESC, c.city;
+```
+</Exercise>
+
+<Exercise hint="Sản phẩm chưa bán có SUM là NULL (bài 12). Hiển thị 0 thay cho NULL bằng hàm nào của bài 7?">
+Với **mọi** sản phẩm, tính tổng số lượng đã được đặt trên mọi đơn (tính mọi trạng thái, kể cả đơn đã hủy); sản phẩm chưa ai đặt thì hiện **0** (không phải NULL). Kết quả gồm 2 cột theo thứ tự: tên sản phẩm, tổng số lượng; sắp theo mã sản phẩm tăng dần.
+
+```sql
+SELECT p.name,
+       COALESCE(SUM(oi.quantity), 0) AS tong_so_luong
+FROM products AS p
+LEFT JOIN order_items AS oi
+  ON oi.product_id = p.id
+GROUP BY p.id, p.name
+ORDER BY p.id;
+```
+</Exercise>
+
+Tới đây, mỗi câu lệnh chỉ nối hai bảng. Nhưng câu hỏi "khách ở Hà Nội đã mua những sản phẩm nào" cần đi qua cả bốn bảng: khách, đơn, chi tiết đơn, sản phẩm. Bài tiếp theo nối nhiều bảng trong một câu lệnh, và nối một bảng với chính nó để biết ai đã giới thiệu ai.

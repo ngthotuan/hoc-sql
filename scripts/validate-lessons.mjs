@@ -314,6 +314,12 @@ for (const lesson of files) {
   if (Number(lesson.front.order) !== plan.order) err(where, `order ${lesson.front.order} khác syllabus ${plan.order}`);
   if (!lesson.front.description) err(where, 'thiếu description');
   if (/code=\{`/.test(lesson.body)) err(where, 'dùng code={`...`}: MDX sẽ xóa thụt lề, hãy dùng khối ```sql bên trong');
+  // Thẻ component nằm giữa đoạn văn làm MDX hiểu sai (build lỗi): phải đứng đầu dòng, sau một dòng trống.
+  for (const [i, line] of lesson.body.split('\n').entries()) {
+    if (/\S.*<(Playground|Exercise|Callout|ShopDiagram)\b/.test(line) && !/^\s*</.test(line)) {
+      err(`${where}:${lesson.bodyStart + i + 1}`, 'thẻ component nằm giữa dòng văn bản; đặt nó trên một dòng riêng, sau một dòng trống');
+    }
+  }
 
   const track = syllabus.tracks[trackOf(lesson.id)];
   const isKnown = knownBefore(plan);
@@ -344,6 +350,15 @@ for (const lesson of files) {
         else if (ch === ',' && depth === 0) commas++;
       }
       if (commas >= 2) warn(at, `"${line.trim()}": từ 3 cột trở lên thì mỗi cột một dòng (style-guide mục 4)`);
+    }
+    // 1–2 cột thường (không biểu thức, không bí danh) thì viết cùng dòng SELECT.
+    for (const m of code.matchAll(/^\s*SELECT\s+(?:DISTINCT\s+)?([\s\S]*?)\n\s*FROM\b/gim)) {
+      const list = m[1];
+      if (!list.includes('\n')) continue;
+      const cols = list.split(',').map((c) => c.trim());
+      if (cols.length <= 2 && cols.every((c) => /^[\w.]+$/.test(c))) {
+        warn(at, `"SELECT ${cols.join(', ')}": 1–2 cột thường thì viết cùng dòng SELECT (style-guide mục 4)`);
+      }
     }
   };
 

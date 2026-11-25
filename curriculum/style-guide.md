@@ -125,7 +125,7 @@ Các lỗi dưới đây đã bị reviewer bắt ở những bài trước. Ki�
 - **Chú thích tiếng Anh ở lần xuất hiện đầu trong mỗi bài**, kể cả những từ quen như bảng (table), hàng (row), cột (column), kết quả (result set), câu lệnh (statement), mệnh đề (clause), điều kiện (condition).
 - **"Hàng" cho row, "dòng" chỉ cho dòng code.** Không viết "mỗi dòng trong bảng".
 - **Không chỉ hàng theo vị trí** ("hàng đầu tiên", "hai hàng đầu") khi câu lệnh không có ORDER BY. Chỉ theo nội dung: "hàng của chị Hà", "hai hàng của đơn số 1".
-- **Ví dụ trong bài phải theo đúng quy tắc trình bày** ở mục 4 (từ 3 cột hoặc có biểu thức thì mỗi cột một dòng; 1–2 cột thì cùng dòng `SELECT`). `npm run validate` cảnh báo dòng `SELECT` có từ 3 cột.
+- **Ví dụ trong bài phải theo đúng quy tắc trình bày** ở mục 4 (từ 3 cột hoặc có biểu thức thì mỗi cột một dòng; 1–2 cột thì cùng dòng `SELECT`). `npm run validate` cảnh báo dòng `SELECT` có từ 3 cột, và 1–2 cột thường bị tách dòng.
 - **Bài tập không chép lại playground.** Đổi cột, đổi tình huống, hoặc mô tả nhu cầu bằng lời để người học tự tìm tên cột. Nên có một bài "sửa câu lệnh lỗi" (dùng `starter={"...\n..."}` chứa lỗi). Câu hỏi đọc kết quả (không chấm được) phải có đáp án trong `<details>`.
 - **Không khẳng định tuyệt đối** ("lỗi phổ biến nhất", "mọi câu SQL đều…") khi không có căn cứ hoặc khi bài sau sẽ có ngoại lệ (ví dụ câu truy vấn bắt đầu bằng `WITH`).
 - **Tóm tắt chỉ chứa điều thân bài đã nói.** Không đưa ý mới vào Tóm tắt.

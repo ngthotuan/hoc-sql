@@ -1,0 +1,274 @@
+---
+title: EXISTS và truy vấn con tương quan
+description: Viết truy vấn con tham chiếu tới hàng đang xét của truy vấn chính, dùng EXISTS và NOT EXISTS để hỏi "có hay không", và tránh bẫy NOT IN khi danh sách có NULL.
+order: 20
+---
+
+Truy vấn con (subquery) ở bài 19 chạy độc lập: `SELECT AVG(price) FROM products` cho cùng một con số, dù truy vấn chính đang xét sản phẩm nào. Nhưng có những câu hỏi mà con số cần so sánh **thay đổi theo từng hàng** (row). "Sản phẩm nào đắt hơn giá trung bình **của chính danh mục nó**?" Với trà sen, cần so với trung bình của các loại trà; với bánh pía, cần so với trung bình của các loại bánh.
+
+Bài này giới thiệu truy vấn con tương quan (correlated subquery): truy vấn con nhắc tới cột (column) của hàng đang xét bên ngoài. Từ đó bạn sẽ học `EXISTS` và `NOT EXISTS` để hỏi "có hàng nào như vậy không", và hiểu vì sao `NOT IN` (bài 6) có thể trả về 0 hàng một cách khó hiểu khi gặp NULL, như bài 6 và bài 19 đã hẹn.
+
+## Truy vấn con tương quan
+
+<Playground>
+```sql
+SELECT p.category,
+       p.name,
+       p.price
+FROM products AS p
+WHERE p.price > (
+  SELECT AVG(p2.price)
+  FROM products AS p2
+  WHERE p2.category = p.category
+)
+ORDER BY p.category, p.name;
+```
+</Playground>
+
+Kết quả (result set) có 6 sản phẩm, mỗi danh mục một hoặc hai. Bánh pía (75000) đắt hơn trung bình của bánh (65000). Arabica (165000) và Culi (145000) đắt hơn trung bình của cà phê (khoảng 143333). Bình giữ nhiệt và máy xay đắt hơn trung bình của dụng cụ (199750). Trà sen (390000) đắt hơn trung bình của trà (khoảng 263333).
+
+So với bài 19 (so với trung bình cả cửa hàng): bình giữ nhiệt, máy xay, trà sen có mặt ở cả hai; trà shan tuyết (260000) biến mất vì rẻ hơn trung bình của trà; còn Arabica, Culi, bánh pía là những cái tên mới, vì chúng rẻ hơn trung bình cả cửa hàng nhưng đắt hơn trung bình trong danh mục của mình.
+
+Chỗ quan trọng là `WHERE p2.category = p.category` bên trong truy vấn con. `p2` là bảng (table) `products` của truy vấn con; `p` là bảng `products` của truy vấn chính. Điều kiện (condition) này nói: "chỉ tính trung bình trên những sản phẩm **cùng danh mục với sản phẩm `p` đang xét**". Vì nhắc tới `p.category`, truy vấn con không còn chạy độc lập: kết quả của nó phụ thuộc vào hàng nào của `p` đang được kiểm tra. Đó là nghĩa của chữ "tương quan".
+
+Về mặt ý nghĩa, database làm như sau: lấy từng sản phẩm `p`, chạy truy vấn con với `p.category` của sản phẩm đó để được trung bình của danh mục, rồi so sánh. Với 12 sản phẩm, truy vấn con được tính lại cho mỗi hàng (dù database thông minh có thể nhớ kết quả cho những hàng cùng danh mục).
+
+Hai bí danh (alias) khác nhau, `p` và `p2`, là bắt buộc: giống tự nối ở bài 18, cùng một bảng đóng hai vai. Nếu cả hai đều là `products` không bí danh, `products.category` sẽ chỉ bảng gần nhất, tức bảng của truy vấn con, và điều kiện thành "danh mục bằng chính nó": luôn đúng.
+
+### Trong SELECT
+
+Truy vấn con tương quan cũng đứng được trong `SELECT`, để tính một giá trị riêng cho mỗi hàng:
+
+<Playground>
+```sql
+SELECT c.name,
+       (SELECT MAX(o.ordered_on)
+        FROM orders AS o
+        WHERE o.customer_id = c.id) AS don_gan_nhat
+FROM customers AS c
+WHERE c.city = 'Hà Nội'
+ORDER BY c.id;
+```
+</Playground>
+
+Bốn khách Hà Nội, mỗi người kèm ngày đặt đơn gần nhất: chị Hà 2025-11-12, Đặng Gia Linh 2025-11-08, Ngô Đức Thịnh 2025-11-16. Dương Hải Yến có `don_gan_nhat` là NULL: chị chưa có đơn nào, `MAX` trên tập rỗng ra NULL (bài 12). Kết quả giống `LEFT JOIN` rồi `GROUP BY` (bài 17), nhưng không cần gom nhóm: mỗi khách vẫn đúng một hàng, vì truy vấn con luôn trả về đúng một giá trị.
+
+## EXISTS: có hàng nào như vậy không?
+
+`EXISTS (truy vấn con)` là một điều kiện: **đúng** nếu truy vấn con trả về ít nhất một hàng, **sai** nếu nó không trả về hàng nào. Nó không quan tâm hàng đó chứa gì, chỉ quan tâm có hay không.
+
+<Playground>
+```sql
+SELECT c.id, c.name
+FROM customers AS c
+WHERE EXISTS (
+  SELECT 1
+  FROM orders AS o
+  WHERE o.customer_id = c.id
+    AND o.status = 'đã hủy'
+);
+```
+</Playground>
+
+Hai khách: Lê Bảo Ngọc (3) và Phạm Quốc Huy (4), những người từng có đơn bị hủy. Bài 19 trả lời cùng câu hỏi này bằng `IN`. Với mỗi khách `c`, database hỏi: "trong `orders` có đơn nào của khách này mà đã hủy không?". Có thì giữ khách, không thì bỏ.
+
+`SELECT 1` là quy ước: vì `EXISTS` chỉ kiểm tra có hàng hay không, cột trong `SELECT` của truy vấn con không quan trọng. Viết `1` để người đọc hiểu ngay rằng không cần dữ liệu nào từ đó. `SELECT *` hay `SELECT o.id` cũng cho cùng kết quả.
+
+`EXISTS` hầu như luôn đi với truy vấn con **tương quan**. Nếu thiếu điều kiện `o.customer_id = c.id`, truy vấn con trở thành "có đơn nào đã hủy không?", câu trả lời là có, cho **mọi** khách, và kết quả là cả 12 khách. Đây là một lỗi dễ mắc với `EXISTS`.
+
+### NOT EXISTS: không có hàng nào
+
+`NOT EXISTS` đảo ngược: đúng khi truy vấn con **không** trả về hàng nào. Đây là một cách viết khác cho câu hỏi "hàng không có cặp" của bài 17 (cuối phần này có ví dụ đặt hai cách cạnh nhau). Ví dụ đầu tiên: khách nào chưa giới thiệu ai?
+
+<Playground>
+```sql
+SELECT c.id, c.name
+FROM customers AS c
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM customers AS k
+  WHERE k.referred_by = c.id
+)
+ORDER BY c.id;
+```
+</Playground>
+
+Bảy khách chưa giới thiệu ai: Võ Thanh Tâm (5), Bùi Anh Tuấn (7), Hoàng Mai Anh (8), Ngô Đức Thịnh (9), Lý Kim Chi (10), Trịnh Quang Vinh (11), Dương Hải Yến (12). Với mỗi khách `c`, truy vấn con tìm những khách `k` do `c` giới thiệu; không tìm thấy ai thì `c` được giữ. Năm khách còn lại (1, 2, 3, 4, 6) đều đã giới thiệu ít nhất một người, khớp với bài tập đếm theo người giới thiệu ở bài 15.
+
+<Callout type="try">
+Đổi `NOT EXISTS` thành `EXISTS`. Kết quả là năm khách 1, 2, 3, 4, 6. Mỗi người chỉ xuất hiện một lần, dù chị Hà giới thiệu tới 3 người: `EXISTS` không nhân bản hàng như `JOIN` (bài 18).
+</Callout>
+
+Bài 17 tìm "khách chưa có đơn" bằng `LEFT JOIN orders … WHERE o.id IS NULL`, cách viết đôi khi gọi là anti-join. Ô dưới đây đặt cách đó cạnh cách viết bằng `NOT EXISTS`:
+
+<Playground>
+```sql
+-- Bài 17: LEFT JOIN rồi lọc hàng không có cặp
+SELECT c.id, c.name
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.id
+WHERE o.id IS NULL
+ORDER BY c.id;
+
+-- NOT EXISTS
+SELECT c.id, c.name
+FROM customers AS c
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM orders AS o
+  WHERE o.customer_id = c.id
+)
+ORDER BY c.id;
+```
+</Playground>
+
+Hai bảng kết quả giống hệt nhau: ba khách 8, 10, 12. `NOT EXISTS` đọc gần với câu hỏi hơn ("khách mà **không tồn tại** đơn nào của họ"), và không cần nghĩ tới việc chọn cột nào để kiểm tra NULL như ở bài 17.
+
+## Bẫy NOT IN với NULL
+
+Quay lại câu hỏi "khách nào chưa giới thiệu ai" và thử trả lời bằng `NOT IN` của bài 19. Danh sách "người đã giới thiệu ai đó" là cột `referred_by`:
+
+<Playground>
+```sql
+-- NOT IN với danh sách có NULL
+SELECT c.id, c.name
+FROM customers AS c
+WHERE c.id NOT IN (SELECT referred_by FROM customers);
+
+-- Vì sao: thử NOT IN với một danh sách viết sẵn
+SELECT 5 NOT IN (1, 2, NULL) AS nam_khong_co,
+       1 NOT IN (1, 2, NULL) AS mot_khong_co;
+```
+</Playground>
+
+Bảng đầu có **0 hàng**. Không báo lỗi, không có cảnh báo, chỉ đơn giản là không còn ai, trong khi `NOT EXISTS` ở phần trước tìm được 7 người. Bảng sau giải thích vì sao: `5 NOT IN (1, 2, NULL)` không ra đúng (1) mà ra **NULL**.
+
+Lý do nằm ở logic ba giá trị của bài 7. Biểu thức (expression) `x NOT IN (1, 2, NULL)` nghĩa là `x <> 1 AND x <> 2 AND x <> NULL`. Vế cuối `x <> NULL` luôn ra "không xác định". Với `x` = 5, hai vế đầu đúng, vế cuối không xác định, nên cả biểu thức không xác định, và `WHERE` loại hàng (bài 7: chỉ giữ hàng làm điều kiện **đúng**). Với `x` = 1 thì vế đầu đã sai, nên cả biểu thức sai (`mot_khong_co` là 0). Tóm lại: chỉ cần danh sách có **một** NULL, `NOT IN` không bao giờ ra đúng, nên `WHERE … NOT IN (…)` loại mọi hàng.
+
+Cột `referred_by` có 5 NULL (khách tự tìm đến), nên danh sách chứa NULL, và câu `NOT IN` mất trắng. Bài 6 và bài 7 đã thấy `NOT IN` loại hàng **có NULL ở cột bên trái**; còn đây là trường hợp ngược lại, NULL nằm **trong danh sách**, và hậu quả còn nặng hơn: mất **mọi** hàng.
+
+`IN` (không có `NOT`) thì không bị ảnh hưởng: `5 IN (1, 2, NULL)` ra không xác định (hàng bị loại, đúng ý), còn `1 IN (1, 2, NULL)` ra đúng.
+
+Hai cách sửa:
+
+- Loại NULL khỏi danh sách: `NOT IN (SELECT referred_by FROM customers WHERE referred_by IS NOT NULL)`. Đúng, nhưng phải nhớ thêm điều kiện mỗi lần.
+- Dùng `NOT EXISTS`. `EXISTS` chỉ hỏi "có hàng nào không", và hàng có `referred_by` NULL đơn giản là không khớp `k.referred_by = c.id`, nên không gây hại. Đây là lý do nhiều người viết SQL dùng `NOT EXISTS` thay cho `NOT IN` với truy vấn con, như một thói quen.
+
+## Bên trong database: EXISTS dừng sớm
+
+Với `EXISTS`, database không cần tìm **mọi** hàng của truy vấn con, chỉ cần tìm thấy **một** hàng là đủ biết câu trả lời "có". Chị Hà có 4 đơn, nhưng để trả lời "chị có đơn nào không", database dừng ngay ở đơn đầu tiên nó gặp. Đó là một lý do `EXISTS` thường nhanh, nhất là khi phía "nhiều" có rất nhiều hàng.
+
+Về nguyên tắc, truy vấn con tương quan chạy lại cho mỗi hàng bên ngoài: 12 khách là 12 lần. Trên bảng lớn, điều đó nghe có vẻ chậm. PostgreSQL thường viết lại `EXISTS` / `NOT EXISTS` thành một kiểu phép nối (JOIN) đặc biệt (semi-join và anti-join: chỉ giữ hàng bên trái có, hoặc không có, cặp; không nhân bản, không điền NULL), giống ý tưởng anti-join của bài 17. SQLite trong ô thực hành tùy câu: với ví dụ `EXISTS` đơn đã hủy ở trên, nó tự dựng một index (chỉ mục) tạm, một cấu trúc giúp tra nhanh mà bài 31 sẽ giải thích, trên `orders` rồi tra thẳng, gần giống một phép nối; với ví dụ `NOT EXISTS` người giới thiệu, nó chạy truy vấn con cho từng khách và dừng ngay khi tìm thấy một hàng. Cách bạn viết diễn đạt **ý định**; cách chạy là việc của database. Bài 31 sẽ cho bạn xem kế hoạch thực thi (execution plan).
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Quên điều kiện tương quan trong EXISTS">
+`WHERE EXISTS (SELECT 1 FROM orders AS o WHERE o.status = 'đã hủy')` thiếu `o.customer_id = c.id`. Truy vấn con không còn phụ thuộc vào khách đang xét, luôn tìm thấy đơn hủy, nên **mọi** khách đều qua: 12 khách thay vì 2. Dấu hiệu: `EXISTS` giữ lại tất cả, hoặc `NOT EXISTS` loại tất cả.
+</Callout>
+
+<Callout type="warn" title="NOT IN với truy vấn con có thể trả về NULL">
+Chỉ một NULL trong danh sách là `WHERE … NOT IN (…)` loại mọi hàng. Trước khi viết `NOT IN (SELECT cột …)`, hỏi: cột đó có thể NULL không? Nếu có, hoặc nếu không chắc, dùng `NOT EXISTS`.
+</Callout>
+
+<Callout type="warn" title="Dùng cùng bí danh cho bảng ở trong và ngoài">
+`FROM products AS p WHERE p.price > (SELECT AVG(p.price) FROM products AS p WHERE p.category = p.category)`: bên trong truy vấn con, `p` chỉ bảng **bên trong**, nên điều kiện so danh mục với chính nó, luôn đúng, và truy vấn con lại thành trung bình của cả cửa hàng. Đặt hai bí danh khác nhau (`p`, `p2`).
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| `x NOT IN (…, NULL)` khi x không có trong danh sách | NULL | NULL | NULL |
+| Kết quả của phép so sánh khi in ra | `1` / `0` | `true` / `false` | `1` / `0` |
+
+Bẫy `NOT IN` là hành vi chuẩn của SQL, giống nhau ở mọi database. Hàng cuối nhắc lại điều bài 7 đã nói: cột `mot_khong_co` ở trên hiện `0` trên SQLite, nhưng `false` trên PostgreSQL.
+
+## Tóm tắt
+
+- Truy vấn con tương quan nhắc tới cột của hàng đang xét bên ngoài (`p2.category = p.category`), nên kết quả của nó thay đổi theo từng hàng. Hai vai của cùng một bảng cần hai bí danh khác nhau.
+- `EXISTS (truy vấn con)` đúng khi truy vấn con trả về ít nhất một hàng; `NOT EXISTS` đúng khi nó không trả về hàng nào. Quy ước viết `SELECT 1` bên trong.
+- `EXISTS` không nhân bản hàng như `JOIN`; `NOT EXISTS` là cách rõ ràng để tìm hàng không có cặp (giống `LEFT JOIN … IS NULL` của bài 17).
+- Chỉ cần danh sách có một NULL là `NOT IN` không bao giờ ra đúng, nên `WHERE … NOT IN (…)` loại mọi hàng. Với truy vấn con, ưu tiên `NOT EXISTS`.
+- Quên điều kiện tương quan thì truy vấn con cho cùng một kết quả với mọi hàng: `EXISTS` thường giữ tất cả, `NOT EXISTS` loại tất cả.
+
+## Bài tập
+
+<Exercise hint="Với mỗi sản phẩm, so tồn kho của nó với tồn kho nhỏ nhất trong cùng danh mục. Hai vai của products cần hai bí danh.">
+Mỗi danh mục, sản phẩm nào **còn ít hàng nhất** (tồn kho nhỏ nhất trong danh mục của nó)? Kết quả gồm 3 cột theo thứ tự: danh mục, tên sản phẩm, tồn kho; sắp theo danh mục.
+
+```sql
+SELECT p.category,
+       p.name,
+       p.stock
+FROM products AS p
+WHERE p.stock = (
+  SELECT MIN(p2.stock)
+  FROM products AS p2
+  WHERE p2.category = p.category
+)
+ORDER BY p.category;
+```
+</Exercise>
+
+<Exercise hint="Truy vấn con trong SELECT, đếm số hàng của order_items có product_id bằng mã của sản phẩm đang xét.">
+Với các sản phẩm danh mục **Dụng cụ**, đếm xem mỗi sản phẩm nằm trong bao nhiêu đơn (tính mọi trạng thái đơn, kể cả đơn đã hủy), **không dùng JOIN hay GROUP BY**. Kết quả gồm 2 cột theo thứ tự: tên sản phẩm, số đơn.
+
+```sql
+SELECT p.name,
+       (SELECT COUNT(*)
+        FROM order_items AS oi
+        WHERE oi.product_id = p.id) AS so_don
+FROM products AS p
+WHERE p.category = 'Dụng cụ';
+```
+</Exercise>
+
+<Exercise hint="'Chưa có đơn đã giao' nghĩa là không tồn tại đơn nào của khách này có trạng thái đã giao. Khách có đơn ở trạng thái khác vẫn tính.">
+Tìm những khách **chưa có đơn nào đã giao** (kể cả khách chưa đặt đơn nào). Kết quả gồm 2 cột theo thứ tự: mã khách, tên khách.
+
+```sql
+SELECT c.id, c.name
+FROM customers AS c
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM orders AS o
+  WHERE o.customer_id = c.id
+    AND o.status = 'đã giao'
+);
+```
+</Exercise>
+
+<Exercise hint="Chạy thử: vì sao kết quả rỗng? Cột referred_by có NULL không?" starter={"SELECT c.id, c.name\nFROM customers AS c\nWHERE c.city = 'Hà Nội'\n  AND c.id NOT IN (SELECT referred_by FROM customers);\n"}>
+Câu lệnh (statement) có sẵn trong ô muốn tìm những khách **ở Hà Nội chưa giới thiệu ai**, nhưng ra 0 hàng. Hãy sửa cho đúng, giữ nguyên 2 cột.
+
+```sql
+SELECT c.id, c.name
+FROM customers AS c
+WHERE c.city = 'Hà Nội'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM customers AS k
+    WHERE k.referred_by = c.id
+  );
+```
+</Exercise>
+
+<Exercise hint="Truy vấn con bên trong EXISTS cũng dùng được JOIN: nối order_items với orders để biết trạng thái đơn.">
+Những sản phẩm nào **từng nằm trong một đơn đã hủy**? Mỗi sản phẩm chỉ xuất hiện một lần. Kết quả gồm 2 cột theo thứ tự: mã sản phẩm, tên sản phẩm.
+
+```sql
+SELECT p.id, p.name
+FROM products AS p
+WHERE EXISTS (
+  SELECT 1
+  FROM order_items AS oi
+  INNER JOIN orders AS o
+    ON o.id = oi.order_id
+  WHERE oi.product_id = p.id
+    AND o.status = 'đã hủy'
+);
+```
+</Exercise>
+
+Tới đây mỗi câu truy vấn (query) trả về một bảng kết quả. Đôi khi bạn cần **ghép** kết quả của hai câu truy vấn lại, ví dụ danh sách liên lạc gồm cả email lẫn số điện thoại, hoặc tìm những khách vừa có đơn hủy vừa có đơn đã giao. Bài tiếp theo giới thiệu `UNION`, `INTERSECT` và `EXCEPT`.

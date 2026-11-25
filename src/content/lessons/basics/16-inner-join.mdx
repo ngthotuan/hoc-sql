@@ -1,0 +1,263 @@
+---
+title: Nối bảng với INNER JOIN
+description: Nối hai bảng theo điều kiện ON để mỗi hàng kết quả có thông tin từ cả hai bảng, ghi rõ cột thuộc bảng nào bằng bí danh bảng, và hiểu vì sao INNER JOIN có thể làm số hàng tăng hoặc giảm.
+order: 16
+---
+
+Bài 15 đi theo khóa ngoại bằng tay: hỏi bảng (table) `orders` xem đơn 14 ghi `customer_id` nào, chép con số 3, rồi tra số 3 trong bảng `customers`. Hai câu truy vấn (query) cho một câu hỏi. Với 20 đơn, cách đó đã mệt; với hàng nghìn đơn thì không thể làm tay.
+
+Bài này giới thiệu phép nối (JOIN): bảo database ghép mỗi hàng (row) của bảng này với hàng **tương ứng** của bảng kia, theo một điều kiện (condition) bạn đặt ra, trong một câu lệnh (statement) duy nhất. Bạn sẽ học `INNER JOIN` với `ON`, cách ghi rõ một cột (column) thuộc bảng nào, và một điều dễ bất ngờ: nối bảng có thể làm số hàng **tăng** lên hoặc làm một số hàng **biến mất**.
+
+## INNER JOIN … ON: ghép hai bảng
+
+Câu lệnh dưới đây lấy các đơn đang chờ xác nhận, kèm luôn tên khách:
+
+<Playground>
+```sql
+SELECT orders.id,
+       orders.ordered_on,
+       customers.name
+FROM orders
+INNER JOIN customers
+  ON orders.customer_id = customers.id
+WHERE orders.status = 'chờ xác nhận'
+ORDER BY orders.id;
+```
+</Playground>
+
+Kết quả (result set) có 3 hàng: đơn 17 của Đặng Gia Linh, đơn 18 của Nguyễn Thu Hà, đơn 20 của Ngô Đức Thịnh. Cột `id` và `ordered_on` lấy từ `orders`, cột `name` lấy từ `customers`, nằm chung trên một hàng. Đó là điều bài 15 phải làm bằng hai câu lệnh.
+
+Đọc câu lệnh từng phần:
+
+- `FROM orders INNER JOIN customers`: lấy dữ liệu từ **hai** bảng.
+- `ON orders.customer_id = customers.id`: điều kiện nối. Một hàng của `orders` được ghép với một hàng của `customers` khi `customer_id` của đơn **bằng** `id` của khách. Đây chính là khóa ngoại (foreign key) và khóa chính (primary key) của bài 15.
+- `orders.id`, `customers.name`: tên bảng, dấu chấm, tên cột. Khi có hai bảng, cách viết này nói rõ cột lấy từ đâu.
+- `WHERE` lọc trên các hàng **đã ghép**, nên nó dùng được cột của cả hai bảng.
+
+Theo quy ước trình bày của khóa học, `INNER JOIN` bắt đầu một dòng mới (nó là một phần của mệnh đề (clause) `FROM`), và `ON` xuống dòng, thụt vào 2 dấu cách.
+
+### INNER JOIN chỉ giữ những cặp khớp nhau
+
+Hãy hình dung database làm như sau: lấy từng hàng của `orders`, tìm trong `customers` những hàng thỏa `ON`, và tạo một hàng kết quả cho **mỗi cặp** khớp nhau. Đơn 18 có `customer_id` là 1, khớp với khách `id` 1, nên tạo ra một hàng "đơn 18, Nguyễn Thu Hà". Hàng nào không tìm được cặp thì **không** xuất hiện trong kết quả. Chữ "inner" (bên trong) nghĩa là chỉ giữ những cặp hàng khớp điều kiện; hàng không có cặp nào bị bỏ.
+
+`JOIN` viết một mình có nghĩa y hệt `INNER JOIN`: INNER là kiểu nối mặc định. Khóa học viết đủ `INNER JOIN` trong bài này cho rõ, và bài 17 sẽ giới thiệu những kiểu nối khác.
+
+## Bí danh bảng
+
+Viết `orders.` và `customers.` trước mỗi cột rất dài. Giống bí danh (alias) cho cột ở bài 3, bạn đặt bí danh cho **bảng** bằng `AS`, rồi dùng bí danh ngắn đó ở mọi chỗ trong câu lệnh:
+
+<Playground>
+```sql
+SELECT o.id AS ma_don,
+       o.ordered_on,
+       c.name,
+       c.city
+FROM orders AS o
+INNER JOIN customers AS c
+  ON o.customer_id = c.id
+WHERE c.city = 'Đà Nẵng';
+```
+</Playground>
+
+Ba đơn của khách ở Đà Nẵng: đơn 4 (2025-04-21) và đơn 14 (2025-10-18) của Lê Bảo Ngọc (đơn 14 mà bài 15 phải tra bằng hai câu lệnh giờ hiện luôn tên khách), đơn 15 (2025-10-30) của Trịnh Quang Vinh. `o` thay cho `orders`, `c` thay cho `customers`. Lần này `WHERE` lọc theo cột của bảng **customers** (`c.city`), dù câu hỏi là về đơn hàng: sau khi ghép, mỗi hàng có đủ thông tin của cả hai bảng.
+
+Một khi đã đặt bí danh, câu lệnh phải dùng bí danh: viết `orders.id` ở chỗ khác sẽ báo lỗi, vì trong câu lệnh này bảng chỉ còn được gọi là `o`. Quy ước của khóa học: bí danh bảng là một hoặc vài chữ cái đầu của tên bảng (`o`, `c`, `p`, `oi` cho `order_items`), và luôn viết `AS` (SQLite và PostgreSQL cho phép bỏ `AS`, nhưng viết ra thì dễ đọc hơn).
+
+Lưu ý thêm `o.id AS ma_don`: cả hai bảng đều có cột tên `id`. Nếu câu lệnh chọn cả `o.id` lẫn `c.id`, bảng kết quả sẽ có hai cột cùng tên `id`; đặt bí danh cho cột giúp phân biệt chúng (phần sau có ví dụ).
+
+### Khi nào bắt buộc ghi tên bảng?
+
+Nếu tên cột chỉ có ở một bảng (`ordered_on`, `city`), database tự biết cột thuộc bảng nào, nên bạn có thể bỏ tiền tố. Nhưng nếu tên cột có ở cả hai bảng, như `id` (có ở cả `orders` lẫn `customers`), database không biết bạn muốn cột nào:
+
+<Playground expect="error">
+```sql
+SELECT id, name
+FROM orders AS o
+INNER JOIN customers AS c
+  ON o.customer_id = c.id;
+```
+</Playground>
+
+SQLite báo `ambiguous column name: id`, PostgreSQL báo `column reference "id" is ambiguous`. "Ambiguous" nghĩa là mơ hồ: `id` có thể là mã đơn hoặc mã khách. Sửa bằng cách ghi rõ `o.id` hay `c.id`. Cột `name` chỉ có ở `customers` nên không bị báo; nhưng nếu nối `customers` với `products` thì cả `id` lẫn `name` đều trùng. Khóa học luôn ghi tiền tố cho **mọi** cột trong câu lệnh có JOIN, kể cả khi không bắt buộc: người đọc biết ngay cột lấy từ đâu, và câu lệnh không bị hỏng khi sau này bảng kia được thêm một cột trùng tên.
+
+## Số hàng có thể tăng, có thể giảm
+
+Hãy nối theo chiều ngược lại: đi từ khách sang đơn. Ô dưới đây xem khách 1 (chị Hà) và khách 8 (Hoàng Mai Anh):
+
+<Playground>
+```sql
+SELECT c.id AS ma_khach,
+       c.name,
+       o.id AS ma_don,
+       o.ordered_on
+FROM customers AS c
+INNER JOIN orders AS o
+  ON o.customer_id = c.id
+WHERE c.id IN (1, 8)
+ORDER BY o.id;
+```
+</Playground>
+
+Kết quả có **4 hàng**, và cả 4 đều là chị Hà. Chị có 4 đơn (1, 3, 11, 18), nên hàng của chị trong `customers` khớp với 4 hàng của `orders` và được **nhân lên** thành 4 hàng kết quả, mỗi hàng một đơn. Đây là bản chất của quan hệ một–nhiều ở bài 15: nối từ phía "một" sang phía "nhiều" thì phía "một" lặp lại.
+
+Còn Hoàng Mai Anh thì **không có hàng nào**. Chị chưa đặt đơn nào, nên hàng của chị không khớp với hàng nào trong `orders`, và `INNER JOIN` bỏ đi. Không có lỗi, không có NULL, chỉ đơn giản là biến mất.
+
+Gộp hai hiệu ứng lại: `customers INNER JOIN orders` cho đúng 20 hàng (mỗi đơn một hàng, vì mỗi đơn có đúng một khách), trong đó 9 khách có đơn xuất hiện, có người lặp lại tới 4 lần, còn khách 8, 10, 12 không xuất hiện. Muốn giữ cả những khách chưa có đơn, bạn cần `LEFT JOIN` ở bài 17.
+
+<Callout type="try">
+Bỏ dòng `WHERE` rồi chạy lại. Đếm số hàng: 20, đúng bằng số đơn. Tìm xem tên Hoàng Mai Anh, Lý Kim Chi, Dương Hải Yến có xuất hiện không.
+</Callout>
+
+## Nối bảng trung gian với sản phẩm
+
+Bài 15 nói `order_items` là bảng trung gian nối đơn với sản phẩm, nhưng chỉ có mã sản phẩm. Nối nó với `products` để có tên sản phẩm và so sánh giá lúc bán với giá hiện tại:
+
+<Playground>
+```sql
+SELECT oi.order_id,
+       p.name,
+       oi.quantity,
+       oi.unit_price,
+       p.price
+FROM order_items AS oi
+INNER JOIN products AS p
+  ON oi.product_id = p.id
+WHERE oi.order_id = 5;
+```
+</Playground>
+
+Đơn 5 có 3 sản phẩm: Robusta (1 gói), bình giữ nhiệt (1 cái), bánh pía (2 hộp). Đặt hai cột giá cạnh nhau, ta thấy ngay điều bài 1 và bài 15 đã nói: Robusta bán với `unit_price` 110000 trong khi `price` hiện tại là 120000. Hai sản phẩm kia có giá lúc bán bằng giá hiện tại. Không có JOIN, bạn phải tra từng mã sản phẩm trong `products` để so.
+
+### JOIN rồi GROUP BY
+
+Sau khi ghép, kết quả là một bảng như mọi bảng khác, nên mọi thứ đã học từ bài 4 tới bài 14 đều dùng được trên nó. Ví dụ, mỗi thành phố có bao nhiêu đơn? Thành phố nằm ở `customers`, đơn nằm ở `orders`:
+
+<Playground>
+```sql
+SELECT c.city,
+       COUNT(*) AS so_don
+FROM orders AS o
+INNER JOIN customers AS c
+  ON o.customer_id = c.id
+GROUP BY c.city
+ORDER BY so_don DESC, c.city;
+```
+</Playground>
+
+Hà Nội 9 đơn, TP.HCM 5, Đà Nẵng 3, Cần Thơ 2, Huế 1. Tổng 20 đơn. Mỗi đơn được ghép với khách của nó, mang theo `city`, rồi `GROUP BY` gom theo thành phố. Hải Phòng **không có** trong kết quả: khách duy nhất ở đó (Hoàng Mai Anh) chưa có đơn, nên không có hàng nào để gom, đúng như phần trên. Bài 18 sẽ đi sâu hơn vào việc kết hợp JOIN với GROUP BY trên nhiều bảng.
+
+## Bên trong database: nối hoạt động thế nào
+
+Về mặt ý nghĩa, `A INNER JOIN B ON điều_kiện` là: xét **mọi cặp** (một hàng của A, một hàng của B), giữ những cặp làm điều kiện đúng. `orders` có 20 hàng, `customers` có 12, nên có 20 × 12 = 240 cặp có thể; `ON o.customer_id = c.id` giữ lại 20 cặp. Điều kiện ra "không xác định" (ví dụ một bên là NULL) cũng bị loại, giống `WHERE` ở bài 7.
+
+Database không thật sự tạo 240 cặp rồi lọc. Nó có vài cách làm nhanh hơn. Một cách là với mỗi đơn, tra thẳng khóa chính `customers.id` để nhảy tới đúng khách; SQLite trong ô thực hành làm như vậy. Cách khác là dựng một bảng băm (hash table, giống một cuốn danh bạ tra theo mã) từ một bên rồi dò bằng bên kia; PostgreSQL hay dùng cách này. Kết quả vẫn y như định nghĩa "mọi cặp, giữ cặp khớp". Bài 31 sẽ cho bạn xem database chọn cách nào.
+
+Thứ tự xử lý cũng mở rộng: `FROM` cùng các `JOIN` chạy **đầu tiên** để tạo ra bảng đã ghép, rồi mới tới `WHERE`, `GROUP BY`, `HAVING`, `SELECT`, `ORDER BY`, `LIMIT` như bài 14. Đó là lý do `WHERE` và `GROUP BY` ở trên dùng được cột của cả hai bảng.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Nối sai cột">
+Điều kiện `ON` sai không báo lỗi. `ON o.id = c.id` (so **mã đơn** với **mã khách**) vẫn chạy và trả về 12 hàng trông rất hợp lý: đơn 1 ghép với khách 1, đơn 2 với khách 2… Nhưng đơn 4 là của khách 3, không phải khách 4. Luôn nối **khóa ngoại** với **khóa chính** mà nó trỏ tới: `o.customer_id = c.id`. Bài 15 đã cảnh báo lỗi nhầm mã này; với JOIN, nó còn khó phát hiện hơn.
+</Callout>
+
+<Callout type="warn" title="Quên ON">
+`FROM orders AS o JOIN customers AS c` thiếu `ON`: PostgreSQL báo lỗi cú pháp (`syntax error at or near ";"`), nhưng SQLite vẫn chạy và ghép **mọi cặp**, cho 240 hàng. Thấy số hàng lớn bất thường (tích của số hàng hai bảng) thì kiểm tra lại `ON`.
+</Callout>
+
+<Callout type="warn" title="Không ghi tên bảng cho cột trùng tên">
+`SELECT id, name` khi nối `orders` với `customers` báo lỗi "ambiguous". Với `customers` và `products`, cả `id` lẫn `name` đều trùng. Ghi tiền tố bí danh cho mọi cột là cách tránh gọn nhất.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| `JOIN` = `INNER JOIN` | có | có | có |
+| Bí danh bảng không có `AS` | có | có | có |
+| `JOIN` thiếu `ON` | chạy, ghép mọi cặp | lỗi cú pháp | chạy, ghép mọi cặp |
+| Cột trùng tên không ghi bảng | lỗi `ambiguous` | lỗi `ambiguous` | lỗi `ambiguous` |
+
+Vì SQLite không bắt lỗi quên `ON`, hãy tự kiểm tra: nếu số hàng kết quả (trước khi lọc bằng `WHERE`) bằng đúng tích số hàng của hai bảng, thì xem lại `ON`. Ghép mọi cặp có lúc cũng hữu ích; bài 18 sẽ giới thiệu cách viết có chủ đích (`CROSS JOIN`).
+
+## Tóm tắt
+
+- `FROM A INNER JOIN B ON điều_kiện` ghép mỗi hàng của A với những hàng của B làm điều kiện đúng; thường là khóa ngoại = khóa chính (`o.customer_id = c.id`). `JOIN` một mình nghĩa là `INNER JOIN`.
+- Đặt bí danh bảng bằng `AS` (`orders AS o`) và ghi tiền tố cho mọi cột (`o.id`, `c.name`). Cột trùng tên mà không ghi tiền tố thì lỗi "ambiguous".
+- `INNER JOIN` chỉ giữ cặp khớp nhau: hàng không có cặp biến mất (khách chưa có đơn), hàng có nhiều cặp được nhân lên (chị Hà 4 đơn thành 4 hàng).
+- `FROM` và `JOIN` chạy đầu tiên; sau đó `WHERE`, `GROUP BY`, `ORDER BY`… làm việc trên bảng đã ghép và dùng được cột của cả hai bảng.
+- `ON` sai cột không báo lỗi mà cho kết quả sai; thiếu `ON` thì SQLite ghép mọi cặp còn PostgreSQL báo lỗi.
+
+## Bài tập
+
+<Exercise hint="Chạy thử và đọc thông báo lỗi. Cột nào có mặt ở cả hai bảng?" starter={"SELECT id,\n       name,\n       ordered_on\nFROM orders AS o\nINNER JOIN customers AS c\n  ON o.customer_id = c.id\nWHERE c.city = 'Huế';\n"}>
+Câu lệnh có sẵn trong ô muốn liệt kê các đơn của khách **ở Huế**, gồm mã đơn, tên khách và ngày đặt, nhưng báo lỗi. Hãy sửa cho đúng, giữ nguyên 3 cột theo thứ tự đó.
+
+```sql
+SELECT o.id,
+       c.name,
+       o.ordered_on
+FROM orders AS o
+INNER JOIN customers AS c
+  ON o.customer_id = c.id
+WHERE c.city = 'Huế';
+```
+</Exercise>
+
+<Exercise hint="Một điều kiện lọc theo cột của orders, một điều kiện lọc theo cột của customers. Sau khi ghép, WHERE dùng được cả hai.">
+Liệt kê các đơn **đã giao** của khách ở **TP.HCM**. Kết quả gồm 3 cột theo thứ tự: mã đơn, tên khách, ngày đặt; sắp theo mã đơn tăng dần.
+
+```sql
+SELECT o.id,
+       c.name,
+       o.ordered_on
+FROM orders AS o
+INNER JOIN customers AS c
+  ON o.customer_id = c.id
+WHERE o.status = 'đã giao'
+  AND c.city = 'TP.HCM'
+ORDER BY o.id;
+```
+</Exercise>
+
+<Exercise hint="Bạn biết tên sản phẩm nhưng order_items chỉ có mã sản phẩm. Nối để lọc theo tên.">
+Những đơn nào có mua **Ly sứ men lam**, mỗi đơn mua bao nhiêu cái? Kết quả gồm 2 cột theo thứ tự: mã đơn, số lượng. (Lọc theo **tên** sản phẩm, không tra mã trước.)
+
+```sql
+SELECT oi.order_id, oi.quantity
+FROM order_items AS oi
+INNER JOIN products AS p
+  ON oi.product_id = p.id
+WHERE p.name = 'Ly sứ men lam';
+```
+</Exercise>
+
+<Exercise hint="Điều kiện lọc so sánh một cột của order_items với một cột của products, trên cùng một hàng đã ghép.">
+Tìm những lần bán mà **giá lúc bán khác giá hiện tại** của sản phẩm. Kết quả gồm 4 cột theo thứ tự: mã đơn, tên sản phẩm, giá lúc bán, giá hiện tại.
+
+```sql
+SELECT oi.order_id,
+       p.name,
+       oi.unit_price,
+       p.price
+FROM order_items AS oi
+INNER JOIN products AS p
+  ON oi.product_id = p.id
+WHERE oi.unit_price <> p.price;
+```
+</Exercise>
+
+<Exercise hint="Danh mục nằm ở products, số lượng và giá lúc bán nằm ở order_items. Nối trước, gom nhóm sau.">
+Tính **doanh thu theo giá lúc bán** (`quantity * unit_price`) của từng danh mục sản phẩm, trên mọi hàng của `order_items`. Kết quả gồm 2 cột theo thứ tự: danh mục, doanh thu; sắp theo doanh thu giảm dần.
+
+```sql
+SELECT p.category,
+       SUM(oi.quantity * oi.unit_price) AS doanh_thu
+FROM order_items AS oi
+INNER JOIN products AS p
+  ON oi.product_id = p.id
+GROUP BY p.category
+ORDER BY doanh_thu DESC;
+```
+</Exercise>
+
+`INNER JOIN` bỏ đi những hàng không có cặp, nên khách chưa đặt đơn nào biến mất khỏi kết quả. Nhưng nhiều câu hỏi cần chính những hàng đó: khách nào chưa từng mua gì? Bài tiếp theo giới thiệu `LEFT JOIN` để giữ chúng lại.

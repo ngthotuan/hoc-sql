@@ -14,6 +14,24 @@ Nhật ký giúp lần viết sau nắm được bối cảnh: đã quyết đ�
 
 ---
 
+## 2026-11-26: Xong basics/16–20; mục lục cuộn được
+- Đã làm: 16 INNER JOIN (PASS vòng 2), 17 LEFT/RIGHT/FULL JOIN (PASS vòng 5), 18 nối nhiều bảng + tự nối + CROSS JOIN (PASS vòng 2), 19 truy vấn con (PASS vòng 3), 20 EXISTS + truy vấn con tương quan (PASS vòng 3) → `done`, có recap.
+- basics/17 vượt quy tắc 3 vòng (5 vòng): các MAJOR còn lại đều là câu chữ/giải thích (thiếu "vì sao" điều kiện bảng trái phải ở WHERE; đề "mỗi thành phố bao nhiêu đơn" không nói trạng thái). Mỗi vòng sửa dứt điểm nên tiếp tục thay vì dừng.
+- Nhiều reviewer bị ngắt do máy ngủ (API "computer went to sleep"); chạy lại là được.
+- Công cụ `npm run validate` thêm:
+  - Thẻ component (`<Playground>`…) nằm giữa dòng văn bản → **lỗi** (MDX build hỏng; bài 17 từng dính do chèn bằng script).
+  - SELECT 1–2 cột thường mà tách dòng, và SELECT ≥3 cột trên một dòng → cảnh báo.
+- Quyết định nội dung:
+  - JOIN: luôn ghi tiền tố bí danh cho mọi cột; FROM+JOIN chạy trước (thứ tự logic), database được phép lọc trước/đổi thứ tự INNER JOIN.
+  - LEFT JOIN: điều kiện bảng phải ở ON, bảng trái ở WHERE (ON không bao giờ loại hàng bên trái: TP.HCM ra 10 khách thay vì 1). Đếm bằng COUNT(khóa bên phải).
+  - SQLite bí danh bảng trùng: không lỗi ngay, chỉ lỗi `ambiguous` khi dùng cột; PostgreSQL lỗi ngay.
+  - Truy vấn con vô hướng nhiều hàng: SQLite lặng lẽ lấy một hàng, PostgreSQL/MySQL lỗi.
+  - SQLite EXISTS dùng index tạm (AUTOMATIC PARTIAL COVERING INDEX); NOT EXISTS chạy CORRELATED SCALAR SUBQUERY. PostgreSQL: Hash Semi/Anti Join.
+  - Đề bài tập phải nói rõ có tính đơn đã hủy hay không (lỗi lặp lại nhiều lần ở bài 17, 18, 20; đã có trong style-guide mục 8).
+- UI: mục lục trang bài cuộn riêng (chỉ danh sách cuộn; nút ẩn/hiện và tên lộ trình đứng yên), tự cuộn tới bài đang đọc sau khi font tải xong; nới lề trái để số hai chữ số không bị cắt.
+- syllabus notes: basics/21 có hẹn UNION thay FULL JOIN trên MySQL (từ bài 17).
+- Cần lưu ý cho bài sau (basics/21 UNION, INTERSECT, EXCEPT): bài 20 câu nối hẹn "danh sách liên lạc gồm cả email lẫn số điện thoại" và "khách vừa có đơn hủy vừa có đơn đã giao". Bài 19/18 hẹn CTE ở bài 22.
+
 ## 2026-11-24: Xong basics/10–15; thêm nút ẩn/hiện mục lục; deploy GitHub Pages
 - Đã làm: 10 (PASS vòng 4), 11 (PASS vòng 1), 12 (PASS vòng 4), 13 (PASS vòng 1), 14 (PASS vòng 2) → `done`, có recap. 15 (PASS vòng 3; vòng 2 bị MAJOR trình bày SELECT 3 cột trên một dòng → `npm run validate` nay tự cảnh báo lỗi này).
 - basics/12 vượt quy tắc 3 vòng: vòng 3 chỉ còn 1 MAJOR về câu chữ đề bài ("nhận đơn" mơ hồ khi có đơn hủy). Đã sửa và cho duyệt vòng 4 thay vì dừng, vì lỗi nhỏ và rõ ràng.

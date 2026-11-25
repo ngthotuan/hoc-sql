@@ -1,0 +1,244 @@
+---
+title: Truy vấn con
+description: Đặt một câu SELECT bên trong câu SELECT khác để dùng kết quả của nó như một giá trị, một danh sách hoặc một bảng tạm, và trả lời những câu hỏi mà WHERE hay JOIN một mình không làm được.
+order: 19
+---
+
+Bài 12 để lại một câu hỏi: những sản phẩm nào **đắt hơn giá trung bình**? `WHERE price > AVG(price)` báo lỗi, vì `WHERE` kiểm tra từng hàng (row) trước khi có bất kỳ phép gộp nào. Nhưng bạn có thể trả lời bằng hai bước: chạy `SELECT AVG(price) FROM products` để được 179083.33…, rồi chạy `SELECT … WHERE price > 179083.33`. Cách đó có hai nhược điểm: phải chép số bằng tay, và khi giá thay đổi thì câu lệnh (statement) thứ hai sai.
+
+Truy vấn con (subquery) gộp hai bước làm một: đặt câu `SELECT` thứ nhất, trong ngoặc, ngay vào chỗ con số. Bài này giới thiệu ba cách dùng truy vấn con: như **một giá trị**, như **một danh sách** cho `IN`, và như **một bảng (table) tạm** trong `FROM`. Bài không có từ khóa (keyword) mới: truy vấn con được viết hoàn toàn bằng những gì bạn đã biết.
+
+## Truy vấn con trả về một giá trị
+
+<Playground>
+```sql
+SELECT name, price
+FROM products
+WHERE price > (SELECT AVG(price) FROM products)
+ORDER BY price;
+```
+</Playground>
+
+Kết quả (result set) có 4 sản phẩm: bình giữ nhiệt (215000), trà shan tuyết (260000), trà sen (390000) và máy xay (450000). Phần trong ngoặc là một câu truy vấn (query) đầy đủ, gọi là truy vấn con; câu bên ngoài gọi là truy vấn chính. Database chạy truy vấn con **trước**, được một giá trị duy nhất (giá trung bình 179083.33…), rồi dùng giá trị đó như một con số viết sẵn trong `WHERE`.
+
+Truy vấn con loại này trả về đúng **1 hàng, 1 cột** (column), nên được gọi là truy vấn con vô hướng (scalar subquery): nó đứng được ở mọi chỗ một giá trị đứng được. Truy vấn con luôn nằm trong ngoặc tròn.
+
+### Trong SELECT
+
+Vì là một giá trị, truy vấn con cũng đứng được trong `SELECT`, ví dụ để so mỗi sản phẩm với giá trung bình:
+
+<Playground>
+```sql
+SELECT name,
+       price,
+       price - (SELECT AVG(price) FROM products) AS chenh_lech
+FROM products
+WHERE category = 'Trà';
+```
+</Playground>
+
+Ba loại trà. Trà ô long (140000) **rẻ hơn** trung bình khoảng 39083 đồng, nên `chenh_lech` âm; trà sen (390000) đắt hơn khoảng 210917 đồng; trà shan tuyết (260000) đắt hơn khoảng 80917 đồng. Truy vấn con tính trung bình trên **cả bảng**, không bị `WHERE category = 'Trà'` của truy vấn chính ảnh hưởng: hai câu `SELECT` có `FROM` và `WHERE` riêng của mình. Đây là điều bài 13 không làm được: `GROUP BY` thì mất từng hàng, còn không gom thì không có trung bình. Truy vấn con cho bạn cả hai cùng lúc.
+
+### Truy vấn con trả về nhiều hàng: lỗi hoặc sai im lặng
+
+Nếu truy vấn con dùng như một giá trị mà lại trả về **nhiều** hàng thì sao? "Sản phẩm rẻ hơn mọi loại bánh" có thể bị viết thành:
+
+<Playground>
+```sql
+-- Sai: truy vấn con trả về 2 giá
+SELECT name, price
+FROM products
+WHERE price < (SELECT price FROM products WHERE category = 'Bánh');
+```
+</Playground>
+
+SQLite vẫn chạy, và trả về 2 sản phẩm: phin nhôm (45000) và bánh đậu xanh (55000). Kết quả sai: bánh đậu xanh **là** một loại bánh, không thể rẻ hơn chính nó. Chuyện xảy ra là truy vấn con trả về 2 giá (75000 của bánh pía, 55000 của bánh đậu xanh), và SQLite lặng lẽ lấy **một** trong hai hàng, ở đây là 75000 của bánh pía, và không có gì bảo đảm sẽ là hàng nào (truy vấn con không có `ORDER BY`). PostgreSQL thì từ chối: `more than one row returned by a subquery used as an expression`.
+
+Cách sửa là bảo đảm truy vấn con chỉ trả về một giá trị, ở đây bằng hàm tổng hợp (aggregate function): `(SELECT MIN(price) FROM products WHERE category = 'Bánh')` cho 55000, và kết quả chỉ còn phin nhôm. Một truy vấn con vô hướng an toàn khi nó dùng hàm tổng hợp không có `GROUP BY`, hoặc lọc theo khóa chính (primary key), ví dụ `WHERE id = 4`.
+
+## Truy vấn con trả về một danh sách: IN
+
+Bài 6 dùng `IN` với danh sách viết sẵn, ví dụ `city IN ('Hà Nội', 'Huế', 'Cần Thơ')`. Danh sách đó cũng có thể đến từ một truy vấn con trả về **một cột, nhiều hàng**:
+
+<Playground>
+```sql
+SELECT id, name
+FROM customers
+WHERE id IN (SELECT customer_id FROM orders WHERE status = 'đã hủy');
+```
+</Playground>
+
+Hai khách từng có đơn bị hủy: Lê Bảo Ngọc (khách 3, đơn 4) và Phạm Quốc Huy (khách 4, đơn 12). Truy vấn con trả về danh sách `customer_id` của các đơn đã hủy, tức (3, 4), rồi truy vấn chính giữ những khách có `id` nằm trong danh sách đó.
+
+Câu hỏi này cũng giải được bằng `INNER JOIN` (bài 16), nhưng có một khác biệt quan trọng: `IN` chỉ hỏi "có nằm trong danh sách không", nên mỗi khách xuất hiện **tối đa một lần**, dù họ có bao nhiêu đơn khớp. `JOIN` thì nhân bản hàng theo số đơn khớp (bài 16, 18). Khi câu hỏi là "những ai **có** …" mà không cần thông tin từ bảng kia, `IN` với truy vấn con thường gọn và an toàn hơn.
+
+<Callout type="try">
+Đổi `'đã hủy'` thành `'đã giao'`. Kết quả có 8 khách, mỗi người một hàng, dù chị Hà có 3 đơn đã giao.
+</Callout>
+
+`NOT IN` cho câu hỏi ngược lại. "Sản phẩm chưa từng được đặt" (bài 17 giải bằng `LEFT JOIN`) viết được thành `WHERE id NOT IN (SELECT product_id FROM order_items)`, ra Trà shan tuyết. Nhưng `NOT IN` có một cái bẫy khi danh sách chứa NULL (bài 6 đã hẹn); bài 20 sẽ giải thích kỹ và giới thiệu cách viết an toàn hơn.
+
+## Truy vấn con trong FROM: bảng tạm
+
+Kết quả của một câu `SELECT` là một bảng. Vậy nó đứng được ở chỗ của một bảng: trong `FROM`. Ví dụ, có bao nhiêu khách đặt 1 đơn, bao nhiêu khách đặt 2 đơn…? Câu hỏi cần gom **hai lần**: gom đơn theo khách để có số đơn của mỗi khách, rồi gom các khách theo số đơn đó.
+
+<Playground>
+```sql
+SELECT t.so_don,
+       COUNT(*) AS so_khach
+FROM (
+  SELECT customer_id,
+         COUNT(*) AS so_don
+  FROM orders
+  GROUP BY customer_id
+) AS t
+GROUP BY t.so_don
+ORDER BY t.so_don;
+```
+</Playground>
+
+Hai khách đặt 1 đơn, bốn khách đặt 2 đơn, hai khách đặt 3 đơn, một khách (chị Hà) đặt 4 đơn. Tổng 2 + 4 + 2 + 1 = 9 khách, đúng bằng số khách có đơn. Truy vấn con bên trong là câu `GROUP BY customer_id` của bài 13, cho 9 hàng; truy vấn chính coi 9 hàng đó như một bảng tên `t`, với hai cột `customer_id` và `so_don`, rồi gom tiếp.
+
+Truy vấn con trong `FROM` cần một bí danh (alias), ở đây `AS t`. PostgreSQL bản cũ và MySQL bắt buộc phải có; khóa học luôn đặt. Cột tính toán bên trong phải có bí danh (`so_don`) để bên ngoài gọi được tên. Về trình bày: truy vấn con nhiều dòng được thụt vào 2 dấu cách bên trong cặp ngoặc.
+
+### Sửa lỗi nhân bản hàng của bài 18
+
+Bài 18 thấy chị Hà bị đếm thành 12 đơn và 12 người được giới thiệu, vì nối hai nhánh "nhiều" cùng lúc. Cách sửa chắc chắn: tính **riêng** từng nhánh trong một truy vấn con, mỗi khách một hàng, rồi mới nối:
+
+<Playground>
+```sql
+SELECT c.name,
+       COALESCE(d.so_don, 0) AS so_don,
+       COALESCE(g.so_nguoi, 0) AS so_nguoi_gioi_thieu
+FROM customers AS c
+LEFT JOIN (
+  SELECT customer_id,
+         COUNT(*) AS so_don
+  FROM orders
+  GROUP BY customer_id
+) AS d
+  ON d.customer_id = c.id
+LEFT JOIN (
+  SELECT referred_by,
+         COUNT(*) AS so_nguoi
+  FROM customers
+  GROUP BY referred_by
+) AS g
+  ON g.referred_by = c.id
+WHERE c.id IN (1, 6, 8)
+ORDER BY c.id;
+```
+</Playground>
+
+Chị Hà 4 đơn, giới thiệu 3 người; Đặng Gia Linh 3 đơn, 1 người; Hoàng Mai Anh 0 và 0. Đúng cả ba. Mỗi truy vấn con trả về **tối đa một hàng cho mỗi khách**, nên nối vào không làm nhân bản gì. `LEFT JOIN` (bài 17) giữ khách không có hàng tương ứng, và `COALESCE` (bài 7) đổi NULL của họ thành 0. Khác với `COUNT(DISTINCT …)`, cách này cũng đúng với `SUM`.
+
+Câu lệnh đã khá dài. Bài 22 sẽ giới thiệu CTE (common table expression), cách đặt tên cho từng truy vấn con ở đầu câu lệnh để đọc từ trên xuống dễ hơn.
+
+## Bên trong database: chạy một lần hay nhiều lần?
+
+Mọi truy vấn con trong bài này **không phụ thuộc** vào truy vấn chính: `SELECT AVG(price) FROM products` cho cùng một kết quả dù truy vấn chính đang xét hàng nào. Database chỉ cần chạy nó **một lần**, nhớ kết quả, rồi dùng lại cho mọi hàng. Truy vấn con trong `FROM` cũng chạy một lần để tạo bảng tạm.
+
+Có một loại truy vấn con khác nhắc tới cột của truy vấn chính, ví dụ "giá trung bình **của danh mục hàng đang xét**". Kết quả của nó thay đổi theo từng hàng, nên về mặt ý nghĩa nó phải chạy lại cho mỗi hàng. Đó là truy vấn con tương quan (correlated subquery), chủ đề của bài 20.
+
+Database cũng thường viết lại truy vấn con thành phép nối khi có lợi, ví dụ `IN (SELECT …)` có thể được thực hiện như một phép nối (JOIN) chỉ giữ một hàng cho mỗi khách. Bạn viết theo cách dễ hiểu nhất; việc chọn cách chạy nhanh là của database.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Truy vấn con vô hướng trả về nhiều hàng">
+Dùng truy vấn con như một giá trị (`=`, `<`, `>`, trong `SELECT`) mà nó trả về nhiều hàng: PostgreSQL báo lỗi, SQLite lặng lẽ lấy một hàng và cho kết quả sai. Dùng hàm tổng hợp (`MIN`, `MAX`, `AVG`) hoặc lọc theo khóa chính để chắc chắn chỉ có một giá trị; nếu thật sự cần so với cả danh sách thì dùng `IN`.
+</Callout>
+
+<Callout type="warn" title="Truy vấn con cho IN trả về nhiều cột">
+`WHERE id IN (SELECT customer_id, status FROM orders)` báo lỗi: `IN` so một giá trị với một danh sách, nên truy vấn con chỉ được có **một** cột. SQLite báo `sub-select returns 2 columns - expected 1`.
+</Callout>
+
+<Callout type="warn" title="Quên bí danh cho truy vấn con trong FROM">
+Bảng tạm cần tên để truy vấn chính gọi tới cột của nó (`t.so_don`). Thiếu bí danh, MySQL và PostgreSQL bản cũ báo lỗi; và dù database cho phép, bạn cũng không có cách nào ghi rõ cột thuộc bảng tạm. Luôn đặt `AS tên`.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| Truy vấn con vô hướng trả về nhiều hàng | lấy một hàng, không báo | lỗi | lỗi |
+| Truy vấn con trong `FROM` không có bí danh | được | được (từ bản 16) | lỗi |
+| Truy vấn con trong `IN` có nhiều cột | lỗi | lỗi | lỗi |
+
+Hàng đầu tiên của bảng là chỗ SQLite dễ dãi nguy hiểm nhất trong bài: câu lệnh sai vẫn ra kết quả trông hợp lý. Hãy tự hỏi mỗi khi viết truy vấn con vô hướng: **nó có chắc chỉ trả về một hàng không?**
+
+## Tóm tắt
+
+- Truy vấn con là một câu `SELECT` đặt trong ngoặc bên trong câu lệnh khác; nó được chạy để lấy kết quả rồi dùng trong truy vấn chính.
+- Trả về 1 hàng, 1 cột (vô hướng): dùng như một giá trị trong `WHERE` hoặc `SELECT`, ví dụ `price > (SELECT AVG(price) FROM products)`. Phải chắc chắn chỉ có một hàng: SQLite lặng lẽ lấy một hàng, PostgreSQL báo lỗi.
+- Trả về 1 cột, nhiều hàng: dùng với `IN` / `NOT IN`. `IN` không nhân bản hàng như `JOIN`.
+- Trả về một bảng: đặt trong `FROM` với bí danh, để gom hai lần hoặc để tính riêng từng nhánh rồi mới nối (tránh nhân bản hàng).
+- Truy vấn con không nhắc tới truy vấn chính chỉ cần chạy một lần.
+
+## Bài tập
+
+<Exercise hint="Giá của Culi lấy bằng một truy vấn con theo khóa chính.">
+Liệt kê những sản phẩm **đắt hơn Cà phê Culi 500g** (sản phẩm mã 11), không gõ giá của Culi vào câu lệnh. Kết quả gồm 2 cột theo thứ tự: tên sản phẩm, giá.
+
+```sql
+SELECT name, price
+FROM products
+WHERE price > (SELECT price FROM products WHERE id = 11);
+```
+</Exercise>
+
+<Exercise hint="Chạy thử: đơn 13 có mấy sản phẩm, câu có sẵn ra mấy hàng? Truy vấn con đang trả về mấy giá trị, và = so với được mấy giá trị?" starter={"SELECT name, price\nFROM products\nWHERE id = (SELECT product_id FROM order_items WHERE order_id = 13);\n"}>
+Câu lệnh có sẵn trong ô muốn liệt kê **các sản phẩm trong đơn 13**, nhưng trên SQLite chỉ ra một sản phẩm (và báo lỗi trên PostgreSQL). Hãy sửa cho đúng, giữ nguyên 2 cột.
+
+```sql
+SELECT name, price
+FROM products
+WHERE id IN (SELECT product_id FROM order_items WHERE order_id = 13);
+```
+</Exercise>
+
+<Exercise hint="Truy vấn con trả về danh sách mã khách đã đặt sản phẩm mã 4. Bên trong truy vấn con cũng dùng được JOIN. Một khách có thể đặt sản phẩm này nhiều lần.">
+Những khách nào đã từng đặt **Ly sứ men lam** (sản phẩm mã 4), tính mọi trạng thái đơn? **Mỗi khách chỉ xuất hiện một lần.** Kết quả gồm 1 cột: tên khách.
+
+```sql
+SELECT name
+FROM customers
+WHERE id IN (
+  SELECT o.customer_id
+  FROM orders AS o
+  INNER JOIN order_items AS oi
+    ON oi.order_id = o.id
+  WHERE oi.product_id = 4
+);
+```
+</Exercise>
+
+<Exercise hint="Giá cao nhất của cả cửa hàng là một giá trị duy nhất. Nhớ bẫy chia số nguyên của bài 3: nhân với 100.0.">
+Với các sản phẩm danh mục **Bánh**, tính giá của mỗi sản phẩm bằng **bao nhiêu phần trăm giá sản phẩm đắt nhất cửa hàng**, làm tròn 1 chữ số thập phân. Kết quả gồm 3 cột theo thứ tự: tên sản phẩm, giá, phần trăm.
+
+```sql
+SELECT name,
+       price,
+       ROUND(price * 100.0 / (SELECT MAX(price) FROM products), 1) AS phan_tram
+FROM products
+WHERE category = 'Bánh';
+```
+</Exercise>
+
+<Exercise hint="Bước 1 (truy vấn con trong FROM): tổng tiền của từng đơn đã giao. Bước 2: trung bình của các tổng đó.">
+Trung bình mỗi đơn **đã giao** trị giá bao nhiêu (theo giá lúc bán)? Kết quả gồm 1 hàng, 1 cột.
+
+```sql
+SELECT AVG(t.tong_tien) AS tb_moi_don
+FROM (
+  SELECT oi.order_id,
+         SUM(oi.quantity * oi.unit_price) AS tong_tien
+  FROM order_items AS oi
+  INNER JOIN orders AS o
+    ON o.id = oi.order_id
+  WHERE o.status = 'đã giao'
+  GROUP BY oi.order_id
+) AS t;
+```
+</Exercise>
+
+Mọi truy vấn con trong bài này chạy độc lập với truy vấn chính. Nhưng "sản phẩm đắt hơn giá trung bình **của chính danh mục nó**" cần một truy vấn con thay đổi theo từng hàng. Bài tiếp theo giới thiệu truy vấn con tương quan, `EXISTS`, và giải thích cái bẫy của `NOT IN` khi gặp NULL.

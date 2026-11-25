@@ -2,9 +2,9 @@
 
 > File này do `npm run validate` tự sinh từ `syllabus.json`. Đừng sửa tay.
 
-**Bài cần làm tiếp theo:** `basics/16-inner-join` (Nối bảng với INNER JOIN), trạng thái: Chưa viết
+**Bài cần làm tiếp theo:** `basics/21-phep-tap-hop` (UNION, INTERSECT, EXCEPT), trạng thái: Chưa viết
 
-## SQL từ con số 0: 15/33 bài xong
+## SQL từ con số 0: 20/33 bài xong
 
 | # | Module | Bài | Trạng thái |
 |---|---|---|---|
@@ -23,11 +23,11 @@
 | 13 | Tổng hợp dữ liệu | Gom nhóm với GROUP BY | Xong |
 | 14 | Tổng hợp dữ liệu | Lọc nhóm với HAVING | Xong |
 | 15 | Nhiều bảng | Khóa chính, khóa ngoại và quan hệ | Xong |
-| 16 | Nhiều bảng | Nối bảng với INNER JOIN | Chưa viết |
-| 17 | Nhiều bảng | LEFT, RIGHT và FULL JOIN | Chưa viết |
-| 18 | Nhiều bảng | Nối nhiều bảng và tự nối | Chưa viết |
-| 19 | Truy vấn lồng nhau | Truy vấn con | Chưa viết |
-| 20 | Truy vấn lồng nhau | EXISTS và truy vấn con tương quan | Chưa viết |
+| 16 | Nhiều bảng | Nối bảng với INNER JOIN | Xong |
+| 17 | Nhiều bảng | LEFT, RIGHT và FULL JOIN | Xong |
+| 18 | Nhiều bảng | Nối nhiều bảng và tự nối | Xong |
+| 19 | Truy vấn lồng nhau | Truy vấn con | Xong |
+| 20 | Truy vấn lồng nhau | EXISTS và truy vấn con tương quan | Xong |
 | 21 | Truy vấn lồng nhau | UNION, INTERSECT, EXCEPT | Chưa viết |
 | 22 | Truy vấn nâng cao | CTE với WITH | Chưa viết |
 | 23 | Truy vấn nâng cao | Window function nhập môn | Chưa viết |

@@ -1214,6 +1214,348 @@
       "hash": "fb750787e495"
     }
   ],
+  "basics/16-inner-join#0dbfffc44111": [
+    {
+      "columns": [
+        "ma_khach",
+        "name",
+        "ma_don",
+        "ordered_on"
+      ],
+      "rows": 4,
+      "hash": "0a391e5a5258"
+    }
+  ],
+  "basics/16-inner-join#63a0435ccf30": [
+    {
+      "columns": [
+        "order_id",
+        "name",
+        "quantity",
+        "unit_price",
+        "price"
+      ],
+      "rows": 3,
+      "hash": "c53a6d495566"
+    }
+  ],
+  "basics/16-inner-join#73a8534ade1d": [
+    {
+      "columns": [
+        "city",
+        "so_don"
+      ],
+      "rows": 5,
+      "hash": "e60373f06be4"
+    }
+  ],
+  "basics/16-inner-join#ca3f884cc2bd": [
+    {
+      "columns": [
+        "ma_don",
+        "ordered_on",
+        "name",
+        "city"
+      ],
+      "rows": 3,
+      "hash": "d6953e1406c6"
+    }
+  ],
+  "basics/16-inner-join#f4d1af47c0b4": [
+    {
+      "columns": [
+        "id",
+        "ordered_on",
+        "name"
+      ],
+      "rows": 3,
+      "hash": "d9e4be9b4fa5"
+    }
+  ],
+  "basics/17-outer-join#afd1819526f6": [
+    {
+      "columns": [
+        "id",
+        "name"
+      ],
+      "rows": 3,
+      "hash": "41fe400acc13"
+    }
+  ],
+  "basics/17-outer-join#b472cce05fe2": [
+    {
+      "columns": [
+        "id",
+        "name",
+        "so_don_da_giao"
+      ],
+      "rows": 8,
+      "hash": "cdd3d84319e1"
+    },
+    {
+      "columns": [
+        "id",
+        "name",
+        "so_don_da_giao"
+      ],
+      "rows": 12,
+      "hash": "6cd377f090d5"
+    }
+  ],
+  "basics/17-outer-join#b6159f254f29": [
+    {
+      "columns": [
+        "ma_khach",
+        "name",
+        "ma_don",
+        "ordered_on"
+      ],
+      "rows": 6,
+      "hash": "77ba8280c213"
+    }
+  ],
+  "basics/17-outer-join#c129df7402e1": [
+    {
+      "columns": [
+        "name",
+        "ma_don"
+      ],
+      "rows": 3,
+      "hash": "10ba4d775894"
+    },
+    {
+      "columns": [
+        "name",
+        "ma_don"
+      ],
+      "rows": 3,
+      "hash": "10ba4d775894"
+    }
+  ],
+  "basics/17-outer-join#e5bc18085902": [
+    {
+      "columns": [
+        "name",
+        "ma_don"
+      ],
+      "rows": 3,
+      "hash": "10ba4d775894"
+    }
+  ],
+  "basics/17-outer-join#f9a024819feb": [
+    {
+      "columns": [
+        "id",
+        "name",
+        "so_don",
+        "dem_hang"
+      ],
+      "rows": 12,
+      "hash": "81247448bce8"
+    }
+  ],
+  "basics/18-join-nhieu-bang#29c226fc4cac": [
+    {
+      "columns": [
+        "name",
+        "so_don",
+        "so_nguoi_gioi_thieu"
+      ],
+      "rows": 2,
+      "hash": "2e5b3b26961b"
+    },
+    {
+      "columns": [
+        "name",
+        "so_don",
+        "so_nguoi_gioi_thieu"
+      ],
+      "rows": 2,
+      "hash": "f378d171094f"
+    }
+  ],
+  "basics/18-join-nhieu-bang#63e1f49b87c6": [
+    {
+      "columns": [
+        "khach",
+        "nguoi_gioi_thieu"
+      ],
+      "rows": 7,
+      "hash": "d48ce7c3cd97"
+    }
+  ],
+  "basics/18-join-nhieu-bang#908ea11989f9": [
+    {
+      "columns": [
+        "name",
+        "tong_chi"
+      ],
+      "rows": 8,
+      "hash": "0db134f896fe"
+    }
+  ],
+  "basics/18-join-nhieu-bang#b4dcc4bb336a": [
+    {
+      "columns": [
+        "name",
+        "ma_don",
+        "san_pham",
+        "quantity"
+      ],
+      "rows": 5,
+      "hash": "c1e3a681d99a"
+    }
+  ],
+  "basics/18-join-nhieu-bang#e782bcc9b757": [
+    {
+      "columns": [
+        "ca_phe",
+        "dung_cu",
+        "gia_combo"
+      ],
+      "rows": 5,
+      "hash": "2fdc2ae7739d"
+    }
+  ],
+  "basics/19-truy-van-con#1064eec6c5eb": [
+    {
+      "columns": [
+        "id",
+        "name"
+      ],
+      "rows": 2,
+      "hash": "7c160b122d4a"
+    }
+  ],
+  "basics/19-truy-van-con#31ede54f3ce7": [
+    {
+      "columns": [
+        "name",
+        "price"
+      ],
+      "rows": 2,
+      "hash": "4c866dc65674"
+    }
+  ],
+  "basics/19-truy-van-con#37aab3a4dd2a": [
+    {
+      "columns": [
+        "so_don",
+        "so_khach"
+      ],
+      "rows": 4,
+      "hash": "fc536b50c20f"
+    }
+  ],
+  "basics/19-truy-van-con#3a5424e9a12a": [
+    {
+      "columns": [
+        "name",
+        "price"
+      ],
+      "rows": 4,
+      "hash": "626ddfb43213"
+    }
+  ],
+  "basics/19-truy-van-con#9cca2a9770b7": [
+    {
+      "columns": [
+        "name",
+        "price",
+        "chenh_lech"
+      ],
+      "rows": 3,
+      "hash": "b5543be1948b"
+    }
+  ],
+  "basics/19-truy-van-con#d7d085ba6dfe": [
+    {
+      "columns": [
+        "name",
+        "so_don",
+        "so_nguoi_gioi_thieu"
+      ],
+      "rows": 3,
+      "hash": "5e777e7cccc3"
+    }
+  ],
+  "basics/20-exists#730cb74ee272": [
+    {
+      "columns": [
+        "id",
+        "name"
+      ],
+      "rows": 2,
+      "hash": "7c160b122d4a"
+    }
+  ],
+  "basics/20-exists#7eba116acbff": [
+    {
+      "columns": [
+        "name",
+        "don_gan_nhat"
+      ],
+      "rows": 4,
+      "hash": "41160828fdd2"
+    }
+  ],
+  "basics/20-exists#9047b262a4bb": [
+    {
+      "columns": [
+        "category",
+        "name",
+        "price"
+      ],
+      "rows": 6,
+      "hash": "50315cb1433f"
+    }
+  ],
+  "basics/20-exists#a21b303440f4": [
+    {
+      "columns": [
+        "id",
+        "name"
+      ],
+      "rows": 7,
+      "hash": "6c68f77e6639"
+    }
+  ],
+  "basics/20-exists#a4be9ae7609b": [
+    {
+      "columns": [
+        "id",
+        "name"
+      ],
+      "rows": 0,
+      "hash": "97d170e1550e"
+    },
+    {
+      "columns": [
+        "nam_khong_co",
+        "mot_khong_co"
+      ],
+      "rows": 1,
+      "hash": "c53d83290e77"
+    }
+  ],
+  "basics/20-exists#dc180b5b2c54": [
+    {
+      "columns": [
+        "id",
+        "name"
+      ],
+      "rows": 3,
+      "hash": "41fe400acc13"
+    },
+    {
+      "columns": [
+        "id",
+        "name"
+      ],
+      "rows": 3,
+      "hash": "41fe400acc13"
+    }
+  ],
   "mysql/01-gioi-thieu#fa1c148de93c": [
     {
       "columns": [

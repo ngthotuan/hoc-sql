@@ -1,0 +1,268 @@
+---
+title: Nối nhiều bảng và tự nối
+description: Nối ba, bốn bảng trong một câu lệnh để trả lời câu hỏi kinh doanh, kết hợp với GROUP BY, nối một bảng với chính nó, ghép mọi cặp bằng CROSS JOIN, và nhận ra khi nào hàng bị nhân bản ngoài ý muốn.
+order: 18
+---
+
+Bài 16 và 17 mỗi lần chỉ nối hai bảng (table). Nhưng nhiều câu hỏi thật cần đi xa hơn. "Khách ở Đà Nẵng đã mua những sản phẩm nào?" cần đi từ khách (`customers`), qua đơn của họ (`orders`), qua chi tiết đơn (`order_items`), tới tên sản phẩm (`products`): đủ cả bốn bảng của sơ đồ ở bài 15.
+
+Bài này nối nhiều bảng trong một câu lệnh (statement), kết hợp với `GROUP BY` để tính tổng theo khách, nối bảng `customers` với chính nó để biết ai giới thiệu ai, giới thiệu `CROSS JOIN`, và chỉ ra một cái bẫy hay gặp khi nối nhiều bảng: hàng bị nhân bản làm phép đếm và phép cộng sai.
+
+## Nối chuỗi: mỗi JOIN thêm một bảng
+
+Mỗi `JOIN … ON …` gắn thêm một bảng vào kết quả (result set) của các bảng đứng trước nó. Đi theo đúng các mũi tên trong sơ đồ quan hệ:
+
+<Playground>
+```sql
+SELECT c.name,
+       o.id AS ma_don,
+       p.name AS san_pham,
+       oi.quantity
+FROM customers AS c
+INNER JOIN orders AS o
+  ON o.customer_id = c.id
+INNER JOIN order_items AS oi
+  ON oi.order_id = o.id
+INNER JOIN products AS p
+  ON p.id = oi.product_id
+WHERE c.city = 'Đà Nẵng'
+ORDER BY o.id, p.name;
+```
+</Playground>
+
+Kết quả có 5 hàng (row). Lê Bảo Ngọc có đơn 4 (máy xay cà phê tay) và đơn 14 (Arabica và máy xay). Trịnh Quang Vinh có đơn 15 (trà sen và trà ô long). Mỗi hàng là **một sản phẩm trong một đơn**, mang theo thông tin của khách và đơn đó.
+
+Đọc từ trên xuống, như đi theo các mũi tên:
+
+1. `customers AS c`: bắt đầu từ khách.
+2. `INNER JOIN orders AS o ON o.customer_id = c.id`: ghép mỗi khách với các đơn của họ (giống bài 16).
+3. `INNER JOIN order_items AS oi ON oi.order_id = o.id`: ghép mỗi đơn với các hàng chi tiết của nó.
+4. `INNER JOIN products AS p ON p.id = oi.product_id`: ghép mỗi hàng chi tiết với sản phẩm của nó, để lấy tên.
+
+Mỗi điều kiện (condition) `ON` nối bảng mới với **một bảng đã có** trong chuỗi, theo đúng một khóa ngoại (foreign key). Đơn 4 bị hủy nhưng vẫn có mặt, vì câu lệnh không lọc trạng thái.
+
+Hãy để ý cột (column) `p.name AS san_pham`: cả `customers` và `products` đều có cột `name`, nên ngoài việc ghi tiền tố (bài 16), ta đặt bí danh (alias) để hai cột tên trong kết quả không trùng nhau.
+
+<Callout type="try">
+Đổi `'Đà Nẵng'` thành `'Hà Nội'`. Kết quả dài hơn nhiều. Thêm `DISTINCT` (bài 9) chỉ giữ cột `p.name` và đổi `ORDER BY` thành `ORDER BY p.name` (bài 9: PostgreSQL không cho sắp theo cột không có trong `SELECT` khi có `DISTINCT`) để có danh sách 9 sản phẩm khác nhau mà khách Hà Nội đã đặt.
+</Callout>
+
+## JOIN rồi GROUP BY: tổng chi tiêu của mỗi khách
+
+Khi đã nối được, mọi thứ ở bài 12–14 đều dùng được. Mỗi khách đã chi bao nhiêu cho các đơn **đã giao**, theo giá lúc bán? Tên khách ở `customers`, trạng thái ở `orders`, số lượng và giá ở `order_items`: cần ba bảng.
+
+<Playground>
+```sql
+SELECT c.name,
+       SUM(oi.quantity * oi.unit_price) AS tong_chi
+FROM customers AS c
+INNER JOIN orders AS o
+  ON o.customer_id = c.id
+INNER JOIN order_items AS oi
+  ON oi.order_id = o.id
+WHERE o.status = 'đã giao'
+GROUP BY c.id, c.name
+ORDER BY tong_chi DESC, c.name;
+```
+</Playground>
+
+Tám khách có đơn đã giao. Chị Hà chi nhiều nhất với 960000 đồng, tiếp theo là Đặng Gia Linh 869000 và Trần Minh Khoa 633000; ít nhất là Võ Thanh Tâm với 220000. Câu lệnh không cần `products`, vì giá lúc bán đã nằm sẵn trong `order_items`. Chỉ nối những bảng câu hỏi thật sự cần: mỗi bảng thừa là thêm việc cho database, và thêm nguy cơ nhân bản hàng (phần sau).
+
+Thứ tự xử lý vẫn như bài 16: `FROM` cùng **mọi** `JOIN` tạo ra một bảng ghép lớn trước, rồi `WHERE` lọc, `GROUP BY` gom, `HAVING` lọc nhóm (nếu có), `SELECT`, `ORDER BY`. Ở đây bảng ghép có 34 hàng (mỗi hàng chi tiết một hàng), `WHERE` giữ những hàng thuộc đơn đã giao, rồi `GROUP BY` gom theo khách.
+
+## Tự nối: nối một bảng với chính nó
+
+Tự nối (self join) là nối một bảng với chính nó. Cột `referred_by` trỏ tới `id` của **cùng** bảng `customers` (bài 15). Để hiện tên người giới thiệu cạnh tên khách, ta nối `customers` với chính nó. Mẹo là đặt **hai bí danh khác nhau** cho cùng một bảng, như thể có hai bản sao:
+
+<Playground>
+```sql
+SELECT k.name AS khach,
+       g.name AS nguoi_gioi_thieu
+FROM customers AS k
+INNER JOIN customers AS g
+  ON k.referred_by = g.id
+ORDER BY k.id;
+```
+</Playground>
+
+Bảy hàng, đúng bằng số khách có người giới thiệu. `k` (khách) và `g` (người giới thiệu) cùng là bảng `customers`, nhưng đóng hai vai khác nhau: với mỗi khách `k`, tìm hàng `g` có `id` bằng `k.referred_by`. Lê Bảo Ngọc do Nguyễn Thu Hà giới thiệu; Bùi Anh Tuấn do Lê Bảo Ngọc giới thiệu; chị Hà xuất hiện ba lần ở cột `nguoi_gioi_thieu` (cho Ngọc, Linh, Yến), đúng như bài 15 đã đếm.
+
+Hai bản sao phải mang tên khác nhau, và mọi cột phải có tiền tố: viết `name` không tiền tố thì báo lỗi `ambiguous` (bài 16), vì database không biết lấy tên của vai nào. Cách rõ nhất là đặt bí danh cho cả hai bản, theo **vai trò** (`k`, `g`) thay vì theo tên bảng.
+
+Năm khách tự tìm đến (`referred_by` là NULL) không có trong kết quả, vì `INNER JOIN` bỏ hàng không có cặp. Đổi thành `LEFT JOIN` (bài 17) thì đủ 12 khách, năm người kia có `nguoi_gioi_thieu` là NULL.
+
+## CROSS JOIN: ghép mọi cặp có chủ đích
+
+Bài 16 cảnh báo rằng quên `ON` thì SQLite ghép **mọi cặp**. Có lúc đó lại chính là điều bạn muốn, và khi đó hãy nói rõ bằng `CROSS JOIN` (không có `ON`). Ví dụ, cửa hàng muốn gợi ý combo "một gói cà phê + một dụng cụ" có tổng giá không quá 250000 đồng:
+
+<Playground>
+```sql
+SELECT cp.name AS ca_phe,
+       dc.name AS dung_cu,
+       cp.price + dc.price AS gia_combo
+FROM products AS cp
+CROSS JOIN products AS dc
+WHERE cp.category = 'Cà phê'
+  AND dc.category = 'Dụng cụ'
+  AND cp.price + dc.price <= 250000
+ORDER BY gia_combo, cp.name, dc.name;
+```
+</Playground>
+
+`CROSS JOIN` ghép mỗi sản phẩm với **mọi** sản phẩm (12 × 12 = 144 cặp), rồi `WHERE` giữ cặp (cà phê, dụng cụ): 3 × 4 = 12 cặp, và trong đó 5 combo không quá 250000 đồng. Rẻ nhất là Robusta + phin nhôm, 165000 đồng; đắt nhất trong danh sách là Culi + ly sứ, 234000 đồng. Đây cũng là một kiểu tự nối: cùng bảng `products`, hai vai (`cp`, `dc`).
+
+`CROSS JOIN` tạo ra số hàng bằng **tích** số hàng của hai bảng, nên rất nhanh phình to. Hai bảng 10000 hàng cho 100 triệu cặp. Chỉ dùng nó khi thật sự cần mọi tổ hợp, và trên bảng nhỏ hoặc đã lọc.
+
+## Bẫy: hàng bị nhân bản
+
+Bài 16 cho thấy nối từ phía "một" sang phía "nhiều" làm hàng lặp lại. Khi nối nhiều bảng, sự lặp lại đó nhân lên, và phép đếm hay phép cộng phía sau có thể sai mà không báo lỗi. Ví dụ, đếm số đơn và số người được giới thiệu của chị Hà và Đặng Gia Linh trong một câu lệnh:
+
+<Playground>
+```sql
+-- Sai: hai nhánh "nhiều" nhân với nhau
+SELECT c.name,
+       COUNT(o.id) AS so_don,
+       COUNT(k.id) AS so_nguoi_gioi_thieu
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.id
+LEFT JOIN customers AS k
+  ON k.referred_by = c.id
+WHERE c.id IN (1, 6)
+GROUP BY c.id, c.name
+ORDER BY c.id;
+
+-- Đếm giá trị khác nhau
+SELECT c.name,
+       COUNT(DISTINCT o.id) AS so_don,
+       COUNT(DISTINCT k.id) AS so_nguoi_gioi_thieu
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.id
+LEFT JOIN customers AS k
+  ON k.referred_by = c.id
+WHERE c.id IN (1, 6)
+GROUP BY c.id, c.name
+ORDER BY c.id;
+```
+</Playground>
+
+Bảng đầu nói chị Hà có **12** đơn và giới thiệu **12** người. Thực tế là 4 đơn và 3 người. Lý do: chị có 4 đơn, nên nối với `orders` cho 4 hàng; mỗi hàng đó lại nối với 3 người được giới thiệu, cho 4 × 3 = 12 hàng. Hai nhánh "nhiều" (đơn và người được giới thiệu) không liên quan gì tới nhau, nhưng `JOIN` ghép **mọi** đơn với **mọi** người được giới thiệu. Đặng Gia Linh có 3 đơn và giới thiệu 1 người, nên 3 × 1 = 3 hàng: số đơn tình cờ đúng (3), còn số người giới thiệu sai (3 thay vì 1).
+
+Bảng sau dùng `COUNT(DISTINCT …)` (bài 12): mỗi đơn, mỗi người chỉ đếm một lần, và kết quả đúng: chị Hà 4 đơn, 3 người; Linh 3 đơn, 1 người. Nhưng `DISTINCT` chỉ cứu được phép **đếm**. Nếu bạn `SUM` một cột bị nhân bản, tổng sẽ bị nhân lên, và `SUM(DISTINCT …)` cũng không cứu được (hai đơn khác nhau có thể có cùng giá trị). Cách chắc chắn là không nối hai nhánh "nhiều" độc lập trong cùng một lần gom nhóm, mà tính riêng từng nhánh; bài 19 về truy vấn con (subquery) và bài 22 về CTE (common table expression) sẽ chỉ cách.
+
+Dấu hiệu nhận biết: con số lớn hơn bạn chờ đợi, hoặc bằng tích của hai con số khác. Mỗi khi nối thêm một bảng, hãy hỏi: **mỗi hàng hiện tại sẽ khớp với bao nhiêu hàng của bảng mới?** Nếu có thể nhiều hơn một, số hàng sẽ tăng.
+
+## Bên trong database: thứ tự nối
+
+Thứ tự xử lý ở phần trước (`FROM` và mọi `JOIN`, rồi mới `WHERE`) là thứ tự **logic**: kết quả phải giống như khi làm đúng theo thứ tự đó. Bên trong, database được phép làm khác đi, miễn kết quả không đổi. Ví dụ nó có thể lọc `c.city = 'Đà Nẵng'` trước để chỉ còn 2 khách, rồi mới tìm đơn của họ; hoặc nối theo thứ tự khác với thứ tự bạn viết. Với `INNER JOIN`, đổi thứ tự nối không đổi kết quả, giống phép nhân. Với `LEFT JOIN` thì database phải cẩn thận hơn, vì đổi chỗ hai bảng làm đổi bảng được giữ đủ (bài 17).
+
+Việc chọn thứ tự nối là một trong những việc chính của bộ tối ưu truy vấn (query optimizer). Với 4 bảng có tới 24 thứ tự; với 10 bảng là hơn 3 triệu, nên database không thử hết mà dùng ước lượng. Bài 31 sẽ cho bạn xem kế hoạch thực thi (execution plan) mà database chọn.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Đếm hoặc cộng trên hàng bị nhân bản">
+Nối thêm một bảng phía "nhiều" làm mỗi hàng cũ lặp lại. `COUNT(*)` khi đó đếm số hàng sau khi ghép, không phải số đơn: chị Hà có 4 đơn nhưng 7 hàng chi tiết. Đếm đối tượng bằng `COUNT(DISTINCT khóa_chính)`, và cảnh giác với `SUM` khi đã nối qua hai nhánh "nhiều".
+</Callout>
+
+<Callout type="warn" title="ON trỏ nhầm bảng trong chuỗi">
+Trong chuỗi `customers → orders → order_items`, điều kiện của `order_items` là `oi.order_id = o.id`, không phải `oi.order_id = c.id`. Viết nhầm vẫn chạy, nhưng ghép chi tiết đơn với **khách có cùng mã số**, một kết quả vô nghĩa. Mỗi `ON` phải đi theo đúng một mũi tên của sơ đồ.
+</Callout>
+
+<Callout type="warn" title="Tự nối mà dùng chung một bí danh">
+Đặt cùng bí danh `c` cho cả hai bản (`FROM customers AS c INNER JOIN customers AS c`): PostgreSQL báo lỗi ngay (`table name "c" specified more than once`). SQLite thì chấp nhận, nhưng hễ bạn viết `c.name` là báo `ambiguous column name: c.name`, vì không biết `c` là vai nào. Tự nối cần hai bí danh khác nhau, đặt theo vai trò.
+</Callout>
+
+## Tóm tắt
+
+- Nối nhiều bảng bằng nhiều `JOIN … ON …` nối tiếp; mỗi `ON` đi theo một khóa ngoại, nối bảng mới với một bảng đã có trong chuỗi. Chỉ nối những bảng câu hỏi cần.
+- Sau khi nối, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY` làm việc trên bảng đã ghép (tổng chi tiêu theo khách cần ba bảng).
+- Tự nối: cùng một bảng với hai bí danh theo vai trò (`customers AS k`, `customers AS g`), ví dụ người giới thiệu.
+- `CROSS JOIN` ghép mọi cặp (tích số hàng); dùng có chủ đích, trên bảng nhỏ hoặc đã lọc.
+- Nối qua phía "nhiều" làm hàng nhân bản; hai nhánh "nhiều" độc lập nhân với nhau (4 đơn × 3 người = 12). Đếm bằng `COUNT(DISTINCT …)`, cảnh giác với `SUM`.
+
+## Bài tập
+
+<Exercise hint="Đi từ khách tới tên sản phẩm qua bốn bảng; lọc theo tên sản phẩm.">
+Những khách nào đã từng đặt **Bánh đậu xanh Hải Dương** (tính mọi trạng thái đơn), trong đơn nào? Kết quả gồm 2 cột theo thứ tự: tên khách, mã đơn; sắp theo mã đơn tăng dần. (Lọc theo **tên** sản phẩm.)
+
+```sql
+SELECT c.name,
+       o.id AS ma_don
+FROM customers AS c
+INNER JOIN orders AS o
+  ON o.customer_id = c.id
+INNER JOIN order_items AS oi
+  ON oi.order_id = o.id
+INNER JOIN products AS p
+  ON p.id = oi.product_id
+WHERE p.name = 'Bánh đậu xanh Hải Dương'
+ORDER BY o.id;
+```
+</Exercise>
+
+<Exercise hint="Thành phố ở customers, trạng thái ở orders, tiền ở order_items. Lọc trạng thái trước khi gom.">
+Tính **doanh thu theo giá lúc bán** của các đơn **đã giao**, theo từng thành phố của khách (chỉ những thành phố có đơn đã giao). Kết quả gồm 2 cột theo thứ tự: thành phố, doanh thu; sắp theo doanh thu giảm dần.
+
+```sql
+SELECT c.city,
+       SUM(oi.quantity * oi.unit_price) AS doanh_thu
+FROM customers AS c
+INNER JOIN orders AS o
+  ON o.customer_id = c.id
+INNER JOIN order_items AS oi
+  ON oi.order_id = o.id
+WHERE o.status = 'đã giao'
+GROUP BY c.city
+ORDER BY doanh_thu DESC;
+```
+</Exercise>
+
+<Exercise hint="Tự nối customers với hai bí danh. Điều kiện thứ hai so thành phố của hai vai.">
+Tìm những khách được giới thiệu bởi một người **ở cùng thành phố** với mình. Kết quả gồm 3 cột theo thứ tự: tên khách, tên người giới thiệu, thành phố.
+
+```sql
+SELECT k.name AS khach,
+       g.name AS nguoi_gioi_thieu,
+       k.city
+FROM customers AS k
+INNER JOIN customers AS g
+  ON k.referred_by = g.id
+WHERE k.city = g.city;
+```
+</Exercise>
+
+<Exercise hint="Ghép mọi cặp (trà, bánh) bằng CROSS JOIN trên products với hai bí danh, rồi lọc theo danh mục, tồn kho của bánh và tổng giá.">
+Cửa hàng muốn gợi ý combo "**một trà + một bánh còn hàng**" (bánh có `stock` lớn hơn 0) với tổng giá **dưới 350000 đồng**. Kết quả gồm 3 cột theo thứ tự: tên trà, tên bánh, tổng giá; sắp theo tổng giá tăng dần.
+
+```sql
+SELECT t.name AS tra,
+       b.name AS banh,
+       t.price + b.price AS gia_combo
+FROM products AS t
+CROSS JOIN products AS b
+WHERE t.category = 'Trà'
+  AND b.category = 'Bánh'
+  AND b.stock > 0
+  AND t.price + b.price < 350000
+ORDER BY gia_combo;
+```
+</Exercise>
+
+<Exercise hint="Chạy thử rồi so với số đơn thật của từng khách. Một đơn có thể có hai sản phẩm cà phê." starter={"SELECT o.customer_id,\n       COUNT(*) AS so_don\nFROM orders AS o\nINNER JOIN order_items AS oi\n  ON oi.order_id = o.id\nINNER JOIN products AS p\n  ON p.id = oi.product_id\nWHERE p.category = 'Cà phê'\nGROUP BY o.customer_id;\n"}>
+Câu lệnh có sẵn trong ô muốn đếm, với mỗi khách, **số đơn có mua ít nhất một sản phẩm cà phê** (danh mục `Cà phê`), nhưng đếm sai cho một khách. Hãy sửa cho đúng, giữ nguyên 2 cột.
+
+```sql
+SELECT o.customer_id,
+       COUNT(DISTINCT o.id) AS so_don
+FROM orders AS o
+INNER JOIN order_items AS oi
+  ON oi.order_id = o.id
+INNER JOIN products AS p
+  ON p.id = oi.product_id
+WHERE p.category = 'Cà phê'
+GROUP BY o.customer_id;
+```
+</Exercise>
+
+Bài 12 đã để lại một câu hỏi chưa trả lời: những sản phẩm nào **đắt hơn giá trung bình**? `WHERE price > AVG(price)` báo lỗi, và nối bảng cũng không giúp được. Bài tiếp theo giới thiệu truy vấn con: đặt một câu `SELECT` bên trong câu `SELECT` khác.
