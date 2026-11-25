@@ -1,0 +1,286 @@
+---
+title: UNION, INTERSECT, EXCEPT
+description: Ghép kết quả của nhiều câu truy vấn thành một bằng UNION và UNION ALL, lấy phần chung và phần khác nhau bằng INTERSECT và EXCEPT, và nắm các quy tắc về số cột, kiểu dữ liệu và thứ tự.
+order: 21
+---
+
+Phép nối (JOIN) ở bài 16–18 ghép các bảng (table) **theo chiều ngang**: mỗi hàng (row) kết quả có thêm cột (column) từ bảng kia. Nhưng có những câu hỏi cần ghép **theo chiều dọc**: chồng hàng của câu truy vấn (query) này lên hàng của câu truy vấn khác. Ví dụ cửa hàng muốn một danh sách liên lạc chung, trong đó mỗi khách có thể xuất hiện với email, với số điện thoại, hoặc cả hai. Đó là hai câu `SELECT` khác nhau, cần gộp thành một bảng kết quả (result set).
+
+Bài này giới thiệu các phép tập hợp (set operation): `UNION` để gộp, `INTERSECT` để lấy phần chung, `EXCEPT` để lấy phần khác nhau. Bài cũng trả lời những câu hỏi bài 17 và bài 20 đã hẹn: bài 20 hẹn danh sách liên lạc và "khách vừa có đơn hủy vừa có đơn đã giao"; bài 17 hẹn cách thay `FULL JOIN` trên MySQL.
+
+## UNION: chồng hai kết quả lên nhau
+
+`UNION` đặt giữa hai câu `SELECT`: lấy các hàng của câu đầu, nối tiếp các hàng của câu sau, thành một bảng kết quả.
+
+<Playground>
+```sql
+SELECT name,
+       'email' AS kenh,
+       email AS lien_he
+FROM customers
+WHERE city = 'Hà Nội'
+  AND email IS NOT NULL
+UNION
+SELECT name,
+       'điện thoại',
+       phone
+FROM customers
+WHERE city = 'Hà Nội'
+  AND phone IS NOT NULL
+ORDER BY name, kenh;
+```
+</Playground>
+
+Kết quả có 6 hàng: ba khách Hà Nội (Nguyễn Thu Hà, Đặng Gia Linh, Dương Hải Yến), mỗi người hai hàng, một hàng email và một hàng số điện thoại. Câu `SELECT` đầu cho 3 hàng email, câu sau cho 3 hàng điện thoại, và `UNION` chồng chúng lên nhau. Ngô Đức Thịnh, khách Hà Nội thứ tư, không có mặt: anh không có email cũng không có số điện thoại, nên không qua được `WHERE` của câu nào.
+
+Quy tắc của `UNION` (và mọi phép tập hợp trong bài này):
+
+- Hai câu `SELECT` phải có **cùng số cột**. Cột được ghép theo **vị trí**: cột thứ nhất với cột thứ nhất, cột thứ hai với cột thứ hai…, không theo tên.
+- Tên cột của kết quả lấy từ câu `SELECT` **đầu tiên** (`name`, `kenh`, `lien_he`). Câu sau không cần đặt bí danh (alias), có đặt cũng không được dùng làm tên cột. (SQLite còn cho `ORDER BY` dùng bí danh của câu sau, PostgreSQL thì báo lỗi, nên luôn dùng tên của câu đầu.)
+- Mỗi câu `SELECT` có `WHERE`, `GROUP BY`, `HAVING` riêng của nó. Chỉ `ORDER BY` (và `LIMIT`) viết **một lần, ở cuối**, và áp cho **cả** kết quả đã gộp, dùng tên cột của câu đầu (hoặc số thứ tự cột). Nó **không** nhận biểu thức (expression) như `LENGTH(name)` (trên cả SQLite và PostgreSQL), và PostgreSQL cũng không nhận tên có tiền tố bảng như `c.name`: cần sắp theo biểu thức thì thêm biểu thức đó thành một cột trong `SELECT` rồi sắp theo tên cột.
+
+Cột `kenh` là một hằng số chữ (`'email'`, `'điện thoại'`) để đánh dấu mỗi hàng đến từ câu nào. Đây là mẹo rất hay dùng với `UNION`.
+
+### UNION loại hàng trùng, UNION ALL giữ nguyên
+
+`UNION` còn làm thêm một việc: **loại hàng trùng nhau**, giống `DISTINCT` ở bài 9. `UNION ALL` thì giữ nguyên mọi hàng của cả hai câu:
+
+<Playground>
+```sql
+-- UNION: loại hàng trùng
+SELECT city
+FROM customers
+WHERE id <= 4
+UNION
+SELECT city
+FROM customers
+WHERE id > 8;
+
+-- UNION ALL: giữ mọi hàng
+SELECT city
+FROM customers
+WHERE id <= 4
+UNION ALL
+SELECT city
+FROM customers
+WHERE id > 8;
+```
+</Playground>
+
+Câu đầu lấy thành phố của khách 1–4 (Hà Nội, TP.HCM, Đà Nẵng, TP.HCM), câu sau lấy thành phố của khách 9–12 (Hà Nội, TP.HCM, Đà Nẵng, Hà Nội). `UNION` cho **3** hàng: Hà Nội, TP.HCM, Đà Nẵng, mỗi thành phố một lần. `UNION` loại cả hàng trùng nằm trong cùng một câu: TP.HCM xuất hiện hai lần ở câu đầu nhưng chỉ còn một hàng. `UNION ALL` cho **8** hàng, đúng bằng 4 + 4, không bỏ gì.
+
+Khi nào dùng cái nào? Nếu hàng trùng là thông tin có nghĩa (bạn sẽ đếm, cộng chúng), hoặc bạn biết chắc không có hàng trùng, dùng `UNION ALL`: nó cũng nhanh hơn vì database không phải tìm và loại hàng trùng. Nếu muốn một danh sách các giá trị khác nhau, dùng `UNION`.
+
+Cũng nên biết khi nào **không** cần phép tập hợp. Nếu hai nhánh lấy cùng các cột từ cùng một bảng, chỉ khác điều kiện, thì `WHERE … OR …` hoặc `IN` gọn hơn và cho cùng kết quả. Phép tập hợp cần thiết khi hai nhánh lấy từ hai bảng khác nhau, khi mỗi nhánh lấy cột khác nhau (như `email` và `phone` ở ô đầu bài), hoặc khi mỗi nhánh cần `GROUP BY` riêng.
+
+<Callout type="try">
+Trong ô trên, thêm `ORDER BY city DESC;` vào cuối câu `UNION` (bỏ dấu `;` ở dòng trước). Thứ tự hàng của kết quả gộp chỉ được bảo đảm khi có `ORDER BY`.
+</Callout>
+
+## INTERSECT và EXCEPT: phần chung và phần khác nhau
+
+`INTERSECT` giữ những hàng có mặt ở **cả hai** kết quả. `EXCEPT` giữ những hàng có ở kết quả **thứ nhất** nhưng **không** có ở kết quả thứ hai. Cả hai cũng loại hàng trùng như `UNION`.
+
+<Playground>
+```sql
+-- Khách đặt trước tháng 6/2025 VÀ đặt lại từ tháng 10/2025
+SELECT customer_id
+FROM orders
+WHERE ordered_on < '2025-06-01'
+INTERSECT
+SELECT customer_id
+FROM orders
+WHERE ordered_on >= '2025-10-01';
+
+-- Khách đặt trước tháng 6/2025 nhưng KHÔNG đặt lại từ tháng 10/2025
+SELECT customer_id
+FROM orders
+WHERE ordered_on < '2025-06-01'
+EXCEPT
+SELECT customer_id
+FROM orders
+WHERE ordered_on >= '2025-10-01';
+```
+</Playground>
+
+Năm đơn đầu tiên (trước 2025-06-01) thuộc về khách 1, 2, 3, 4. Từ tháng 10, những khách đặt đơn là 1, 2, 3, 5, 6, 9, 11. Bảng đầu (`INTERSECT`) có khách **1, 2, 3**: những khách quen đã quay lại. Bảng sau (`EXCEPT`) có khách **4** (Phạm Quốc Huy): có đặt từ sớm nhưng không đặt đơn nào từ tháng 10 (đơn gần nhất của anh đặt ngày 2025-09-28), một khách cửa hàng nên liên hệ. Thứ tự hai câu trong `EXCEPT` quan trọng: đổi chỗ thì được "khách đặt từ tháng 10 nhưng không đặt trước tháng 6", một câu hỏi khác hẳn.
+
+Câu hỏi bài 20 hẹn, "khách vừa có đơn hủy vừa có đơn đã giao", bạn sẽ tự viết ở phần bài tập.
+
+### Phép tập hợp coi các NULL là bằng nhau
+
+So sánh `=` coi NULL không bằng gì, kể cả NULL (bài 7). Nhưng các phép tập hợp, giống `DISTINCT` (bài 9), coi hai NULL là **cùng một giá trị**:
+
+<Playground>
+```sql
+SELECT referred_by
+FROM customers
+WHERE id <= 5
+INTERSECT
+SELECT referred_by
+FROM customers
+WHERE id > 5;
+```
+</Playground>
+
+Hai hàng: NULL và 1. Khách 1, 2, 5 (nhóm đầu) và khách 8, 11 (nhóm sau) đều tự tìm đến, nên cả hai nhóm có NULL, và `INTERSECT` coi đó là giá trị chung. Khách 3 (nhóm đầu) và khách 6, 12 (nhóm sau) đều do chị Hà giới thiệu, nên giá trị 1 cũng chung. Nhờ cách đối xử với NULL này, `EXCEPT` không mắc bẫy của `NOT IN` ở bài 20: một NULL trong kết quả thứ hai không làm mất mọi hàng của kết quả thứ nhất.
+
+<Callout type="try">
+Chạy `SELECT id FROM customers EXCEPT SELECT referred_by FROM customers;`. Kết quả là 7 khách chưa giới thiệu ai (5, 7, 8, 9, 10, 11, 12), giống `NOT EXISTS` ở bài 20, trong khi câu `NOT IN` tương ứng ở bài 20 ra 0 hàng.
+</Callout>
+
+Thêm một cách viết cho "khách chưa có đơn", sau `LEFT JOIN … IS NULL` (bài 17) và `NOT EXISTS` (bài 20): `SELECT id FROM customers EXCEPT SELECT customer_id FROM orders` cho đúng ba khách 8, 10, 12. Cách này ngắn, nhưng chỉ trả về **mã**; muốn có tên thì vẫn cần nối hoặc dùng truy vấn con (subquery).
+
+## Thay FULL JOIN bằng UNION
+
+Bài 17 đã nói MySQL không có `FULL JOIN` và hẹn bài này chỉ cách thay. Ý tưởng: `FULL JOIN` = những hàng của `LEFT JOIN` theo chiều này, gộp với những hàng của `LEFT JOIN` theo chiều ngược lại. `UNION` loại đi những cặp có mặt ở cả hai chiều:
+
+<Playground>
+```sql
+SELECT COUNT(*) AS so_hang
+FROM (
+  SELECT c.id AS ma_khach,
+         c.name,
+         o.id AS ma_don
+  FROM customers AS c
+  LEFT JOIN orders AS o
+    ON o.customer_id = c.id
+  UNION
+  SELECT c.id,
+         c.name,
+         o.id
+  FROM orders AS o
+  LEFT JOIN customers AS c
+    ON o.customer_id = c.id
+) AS t;
+```
+</Playground>
+
+Kết quả là **23** hàng, đúng bằng `FULL JOIN` ở bài 17. Chiều thứ nhất cho 23 hàng (20 đơn và 3 khách chưa có đơn), chiều thứ hai cho 20 hàng (mỗi đơn một hàng), và 20 hàng đó trùng với 20 hàng có cặp của chiều thứ nhất, nên `UNION` chỉ giữ một bản. Toàn bộ phép gộp được đặt trong `FROM` như một bảng tạm (bài 19) để đếm. Ở dữ liệu này, chiều thứ hai không đóng góp hàng mới vì đơn nào cũng có khách (bài 17); nó cần thiết khi bảng bên phải có hàng không có cặp.
+
+Cách này dựa vào việc `UNION` loại hàng trùng. Nếu bản thân dữ liệu có hai hàng giống hệt nhau thật sự, `UNION` cũng sẽ gộp chúng; vì vậy nên đưa vào khóa chính (primary key) của **cả hai** bảng (ở đây `ma_khach` và `ma_don`). Hai khách trùng tên cùng chưa có đơn sẽ cho hai hàng (tên, NULL) giống hệt nhau, và `UNION` gộp chúng làm một. Thêm mã khách thì hai hàng khác nhau, nên được giữ đủ.
+
+<Callout type="try">
+Chạy riêng phần trong ngoặc (bỏ dòng `SELECT COUNT(*) AS so_hang` cùng `FROM (` và `) AS t;`, thêm `;` ở cuối) để xem 23 hàng đã gộp. Tìm ba hàng có `ma_don` là NULL: đó là ba khách chưa có đơn.
+</Callout>
+
+## Bên trong database: loại hàng trùng tốn công
+
+Để loại hàng trùng, `UNION`, `INTERSECT`, `EXCEPT` phải tìm ra những hàng giống nhau: database thường sắp xếp kết quả rồi bỏ những hàng giống nhau đứng cạnh nhau, hoặc dùng bảng băm (hash table) để nhớ những hàng đã gặp. Việc này giống `DISTINCT` ở bài 9 và tốn thêm thời gian với kết quả lớn. `UNION ALL` thì chỉ việc nối hai kết quả, không so sánh gì.
+
+Cũng vì cách làm này, SQLite thường trả kết quả của `UNION` theo thứ tự đã sắp, như ở các ô trên. Đó là tình cờ của cách thực hiện, không phải lời hứa: PostgreSQL có thể trả theo thứ tự khác. Cần thứ tự thì viết `ORDER BY`.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Hai câu SELECT có số cột khác nhau">
+`SELECT name, price FROM products UNION SELECT name FROM customers` báo lỗi: SQLite ghi `SELECTs to the left and right of UNION do not have the same number of result columns`. Mọi câu trong phép tập hợp phải có cùng số cột; thiếu thì thêm một hằng số (`NULL` hoặc `'không có'`) cho đủ.
+</Callout>
+
+<Callout type="warn" title="Ghép hai cột khác kiểu">
+`SELECT name FROM products UNION SELECT joined_on FROM customers` chạy trên SQLite (một cột lẫn tên và ngày), nhưng PostgreSQL báo `UNION types text and date cannot be matched`. Cột ở cùng vị trí phải cùng kiểu dữ liệu (data type); dùng `CAST` (bài 10) khi cần, ví dụ `CAST(joined_on AS TEXT)`. Và trước hết, hãy tự hỏi việc ghép tên với ngày có nghĩa gì không.
+</Callout>
+
+<Callout type="warn" title="Trộn UNION với INTERSECT trong một câu">
+`SELECT 1 UNION SELECT 2 INTERSECT SELECT 2` ra **2** trên SQLite nhưng ra **1, 2** trên PostgreSQL. Theo chuẩn SQL (PostgreSQL làm theo), `INTERSECT` được làm trước `UNION`, giống nhân trước cộng. SQLite thì làm lần lượt từ trái sang phải, và không cho đặt ngoặc quanh từng câu `SELECT` để ép thứ tự. Khi cần trộn, tách từng bước ra truy vấn con (hoặc CTE (common table expression) ở bài 22) cho rõ ràng.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| `UNION`, `UNION ALL` | có | có | có |
+| `INTERSECT`, `EXCEPT` | có | có | có (từ bản 8.0.31) |
+| Ghép cột khác kiểu | chạy | lỗi, cần `CAST` | tự đổi kiểu |
+| Thứ tự ưu tiên `INTERSECT` / `UNION` | trái sang phải | `INTERSECT` trước | `INTERSECT` trước |
+| Ngoặc quanh từng câu `SELECT` | không | có | có |
+
+## Tóm tắt
+
+- `UNION` chồng kết quả của hai câu `SELECT` và loại hàng trùng; `UNION ALL` giữ mọi hàng (nhanh hơn).
+- `INTERSECT` giữ hàng có ở cả hai; `EXCEPT` giữ hàng có ở câu đầu mà không có ở câu sau (thứ tự hai câu quan trọng).
+- Các câu phải cùng số cột, ghép theo vị trí, cột cùng vị trí nên cùng kiểu; tên cột lấy từ câu đầu; `ORDER BY` viết một lần ở cuối, sắp cả kết quả.
+- Phép tập hợp coi các NULL là bằng nhau, nên `EXCEPT` không mắc bẫy NULL của `NOT IN`.
+- Thay `FULL JOIN` bằng hai `LEFT JOIN` ngược chiều ghép bằng `UNION`. Trộn `UNION` với `INTERSECT` cho kết quả khác nhau giữa SQLite và PostgreSQL: tách ra từng bước.
+
+## Bài tập
+
+<Exercise hint="Hai tập mã khách: khách có đơn đã hủy, khách có đơn đã giao. Lấy phần chung.">
+Những khách nào **vừa có đơn đã hủy, vừa có đơn đã giao**? Kết quả gồm 1 cột: mã khách (`customer_id`).
+
+```sql
+SELECT customer_id
+FROM orders
+WHERE status = 'đã hủy'
+INTERSECT
+SELECT customer_id
+FROM orders
+WHERE status = 'đã giao';
+```
+</Exercise>
+
+<Exercise hint="Hai điều kiện (condition), mỗi điều kiện một câu SELECT. Sản phẩm thỏa cả hai chỉ được xuất hiện một lần.">
+Cửa hàng cần danh sách sản phẩm "cần chú ý": giá **từ 150000 đồng trở lên**, hoặc tồn kho **dưới 30**. Viết bằng phép tập hợp, mỗi sản phẩm chỉ xuất hiện **một lần**. Kết quả gồm 1 cột: tên sản phẩm.
+
+```sql
+SELECT name
+FROM products
+WHERE price >= 150000
+UNION
+SELECT name
+FROM products
+WHERE stock < 30;
+```
+</Exercise>
+
+<Exercise hint="Danh sách đầu: mọi khách. Danh sách sau: khách có ít nhất một đơn đã giao. Lấy phần có ở danh sách đầu mà không có ở danh sách sau.">
+Dùng `EXCEPT`, tìm những khách **chưa từng nhận một đơn đã giao** nào (kể cả khách chưa đặt đơn nào). Kết quả gồm 1 cột: mã khách.
+
+```sql
+SELECT id
+FROM customers
+EXCEPT
+SELECT customer_id
+FROM orders
+WHERE status = 'đã giao';
+```
+</Exercise>
+
+<Exercise hint="Chạy thử và đọc thông báo lỗi. Câu SELECT thứ hai đang thiếu gì?" starter={"SELECT name, email AS lien_he\nFROM customers\nWHERE email IS NOT NULL\nUNION\nSELECT name\nFROM customers\nWHERE email IS NULL\n  AND phone IS NOT NULL;\n"}>
+Câu lệnh (statement) có sẵn trong ô muốn lập danh sách liên lạc: khách **có email** thì lấy email; khách **không có email nhưng có số điện thoại** thì lấy số điện thoại. Câu lệnh đang báo lỗi. Hãy sửa cho đúng, kết quả gồm 2 cột: tên khách, thông tin liên lạc.
+
+```sql
+SELECT name, email AS lien_he
+FROM customers
+WHERE email IS NOT NULL
+UNION
+SELECT name, phone
+FROM customers
+WHERE email IS NULL
+  AND phone IS NOT NULL;
+```
+</Exercise>
+
+<Exercise hint="Câu đầu: đếm khách đăng ký theo tháng. Câu sau: đếm đơn theo tháng. Mỗi câu có WHERE và GROUP BY riêng; ORDER BY viết một lần ở cuối. Mỗi câu thêm một cột hằng số để biết hàng thuộc loại nào, rồi gộp mà không loại gì.">
+Trong khoảng **từ 2025-04-01 tới trước 2025-08-01**, mỗi tháng có bao nhiêu **khách mới đăng ký** và bao nhiêu **đơn được đặt** (tính mọi trạng thái, kể cả đơn đã hủy)? Gộp vào một bảng gồm 3 cột theo thứ tự: tháng (dạng `2025-04`), loại (`'khách mới'` hoặc `'đơn'`), số lượng. Chỉ có hàng cho những tháng có số liệu. Sắp theo tháng, rồi theo loại. (Như bài 8, chữ có dấu sắp theo mã ký tự, nên `'khách mới'` đứng trước `'đơn'`.)
+
+```sql
+SELECT STRFTIME('%Y-%m', joined_on) AS thang,
+       'khách mới' AS loai,
+       COUNT(*) AS so_luong
+FROM customers
+WHERE joined_on >= '2025-04-01'
+  AND joined_on < '2025-08-01'
+GROUP BY STRFTIME('%Y-%m', joined_on)
+UNION ALL
+SELECT STRFTIME('%Y-%m', ordered_on),
+       'đơn',
+       COUNT(*)
+FROM orders
+WHERE ordered_on >= '2025-04-01'
+  AND ordered_on < '2025-08-01'
+GROUP BY STRFTIME('%Y-%m', ordered_on)
+ORDER BY thang, loai;
+```
+</Exercise>
+
+Bài tiếp theo giới thiệu `WITH` (CTE): đặt tên cho từng bước trung gian ở đầu câu lệnh, để những câu lồng nhiều tầng như câu thay `FULL JOIN` đọc được từ trên xuống.

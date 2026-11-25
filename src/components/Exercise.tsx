@@ -21,6 +21,8 @@ type Verdict =
 // ---------------------------------------------------------------------------
 // So sánh kết quả
 // ---------------------------------------------------------------------------
+const MUTATES = /\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)\b/i;
+
 function norm(v: unknown): string {
   if (v === null || v === undefined) return '∅';
   if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(Math.round(v * 1e6) / 1e6);
@@ -117,6 +119,9 @@ export default function Exercise({ engine, dataset, solution, starter, hint, sto
       }
       expected.current = ref.results.at(-1)!;
     }
+    // Bài tập thay đổi dữ liệu (INSERT, UPDATE…): lời giải mẫu hoặc lần chạy trước đã sửa database,
+    // nên khôi phục dữ liệu gốc trước khi chạy câu của người học.
+    if (MUTATES.test(solution)) await session.reset();
     const res = await session.exec(sql);
     setBusy(null);
     if (!res.ok) {

@@ -190,7 +190,7 @@ Vì SQLite không bắt lỗi quên `ON`, hãy tự kiểm tra: nếu số hàng
 ## Bài tập
 
 <Exercise hint="Chạy thử và đọc thông báo lỗi. Cột nào có mặt ở cả hai bảng?" starter={"SELECT id,\n       name,\n       ordered_on\nFROM orders AS o\nINNER JOIN customers AS c\n  ON o.customer_id = c.id\nWHERE c.city = 'Huế';\n"}>
-Câu lệnh có sẵn trong ô muốn liệt kê các đơn của khách **ở Huế**, gồm mã đơn, tên khách và ngày đặt, nhưng báo lỗi. Hãy sửa cho đúng, giữ nguyên 3 cột theo thứ tự đó.
+Câu lệnh có sẵn trong ô muốn liệt kê các đơn (mọi trạng thái) của khách **ở Huế**, gồm mã đơn, tên khách và ngày đặt, nhưng báo lỗi. Hãy sửa cho đúng, giữ nguyên 3 cột theo thứ tự đó.
 
 ```sql
 SELECT o.id,

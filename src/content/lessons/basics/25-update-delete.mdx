@@ -1,0 +1,335 @@
+---
+title: Sửa và xóa với UPDATE, DELETE
+description: Sửa dữ liệu với UPDATE … SET … WHERE, xóa hàng với DELETE, tập thói quen chạy SELECT với cùng WHERE trước khi sửa hay xóa, và hiểu vì sao khóa ngoại ngăn xóa hàng đang được tham chiếu.
+order: 25
+---
+
+Bài 24 thêm hàng (row) mới vào bảng (table). Nhưng dữ liệu cũ cũng thay đổi: Trịnh Quang Vinh vừa để lại số điện thoại, các đơn chờ xác nhận đã được gửi đi, giá trà tăng 10%. Có khi còn phải xóa, ví dụ một đơn đã hủy không cần lưu.
+
+Bài này giới thiệu hai câu lệnh (statement) còn lại để thay đổi dữ liệu: `UPDATE` để sửa, `DELETE` để xóa. Thiếu mệnh đề (clause) `WHERE` là chúng sửa hay xóa **cả bảng**, nên bài cũng dạy một thói quen an toàn đi kèm mỗi lần sửa, xóa. Như bài 24, mỗi ô thực hành có database riêng; nút Khôi phục đưa ô về dữ liệu gốc, và nút Kiểm tra ở phần bài tập tự khôi phục trước mỗi lần chấm.
+
+## UPDATE … SET … WHERE
+
+<Playground>
+```sql
+UPDATE customers
+SET phone = '0935999888'
+WHERE id = 11;
+
+SELECT id,
+       name,
+       phone
+FROM customers
+WHERE id = 11;
+```
+</Playground>
+
+Kết quả (result set) của câu `SELECT` cho thấy Trịnh Quang Vinh (khách 11) giờ có số điện thoại `0935999888`; trước đó cột (column) `phone` của anh là NULL. Đọc câu `UPDATE`:
+
+- `UPDATE customers`: sửa bảng `customers`.
+- `SET phone = '0935999888'`: gán giá trị mới cho cột `phone`.
+- `WHERE id = 11`: chỉ sửa những hàng thỏa điều kiện (condition), ở đây là đúng một khách. `WHERE` hoạt động y như trong `SELECT` từ bài 4: mọi điều kiện, `AND`, `IN`, truy vấn con (subquery)… đều dùng được.
+
+Cột không nhắc tới trong `SET` giữ nguyên. Hàng không thỏa `WHERE` giữ nguyên.
+
+### Sửa nhiều cột, nhiều hàng
+
+`SET` nhận nhiều cột, cách nhau bằng dấu phẩy. Và `WHERE` có thể khớp nhiều hàng: mọi hàng khớp đều được sửa. Tình huống: hôm nay cửa hàng gửi đi cả ba đơn đang chờ xác nhận. Mỗi đơn cần đổi trạng thái thành `đang giao` và ghi ngày gửi.
+
+<Playground>
+```sql
+-- Bước 1: xem trước những hàng sẽ bị sửa
+SELECT id,
+       status,
+       shipped_on
+FROM orders
+WHERE status = 'chờ xác nhận';
+
+-- Bước 2: sửa đúng những hàng đó
+UPDATE orders
+SET status = 'đang giao',
+    shipped_on = '2025-11-20'
+WHERE status = 'chờ xác nhận';
+
+-- Bước 3: kiểm tra
+SELECT status,
+       COUNT(*) AS so_don
+FROM orders
+GROUP BY status
+ORDER BY status;
+```
+</Playground>
+
+Bảng đầu liệt kê ba đơn 17, 18, 20, đúng ba đơn chờ xác nhận, cả ba đều chưa có ngày gửi (`shipped_on` là NULL). Câu `UPDATE` đổi cả hai cột của ba đơn đó. Bảng cuối cho thấy: `đang giao` từ 3 lên 6 đơn, `chờ xác nhận` không còn, `đã giao` vẫn 12 và `đã hủy` vẫn 2.
+
+Bước 1 là **thói quen an toàn** của bài này: trước khi `UPDATE` hay `DELETE`, chạy một câu `SELECT` với **cùng `WHERE`** để thấy chính xác những hàng nào sẽ bị ảnh hưởng, và bao nhiêu hàng. Ba hàng như mong đợi thì mới sửa. Ra 300 hàng khi bạn chỉ định sửa một khách thì dừng lại.
+
+Về trình bày: `UPDATE`, `SET`, `WHERE` mỗi mệnh đề một dòng; nhiều cột trong `SET` thì mỗi cột một dòng, canh thẳng dưới cột đầu.
+
+### Giá trị mới tính từ giá trị cũ
+
+Phần bên phải dấu `=` trong `SET` là một biểu thức (expression), và có thể dùng chính giá trị hiện tại của cột. Giá trà tăng 10%:
+
+<Playground>
+```sql
+UPDATE products
+SET price = price * 110 / 100
+WHERE category = 'Trà';
+
+SELECT name, price
+FROM products
+WHERE category = 'Trà'
+ORDER BY price;
+```
+</Playground>
+
+Trà ô long từ 140000 thành 154000, trà shan tuyết từ 260000 thành 286000, trà sen từ 390000 thành 429000. Với mỗi hàng khớp `WHERE`, database đọc `price` hiện tại của hàng đó, tính biểu thức, rồi ghi kết quả vào lại cột. Viết `price * 110 / 100` thay cho `price * 1.1` để giá vẫn là số nguyên đồng. Trên SQLite, `price * 1.1` làm giá trà sen thành `429000.00000000006`, một số thực; bài 10 đã nói tiền nên lưu bằng số nguyên. Ba giá này đều chia hết nên không mất phần lẻ.
+
+Chạy ô này hai lần sẽ tăng giá hai lần (trà ô long thành 169400…). `UPDATE` không biết bạn "đã tăng rồi": mỗi lần chạy là một lần sửa mới.
+
+### Giá trị mới lấy từ bảng khác
+
+Phần bên phải dấu `=` cũng có thể là một truy vấn con vô hướng (bài 19), kể cả truy vấn con tương quan (correlated subquery, bài 20). Tình huống: đơn 18 được xác nhận, cửa hàng trừ tồn kho của từng món theo số lượng trong đơn.
+
+<Playground>
+```sql
+UPDATE products
+SET stock = stock - (
+  SELECT oi.quantity
+  FROM order_items AS oi
+  WHERE oi.order_id = 18
+    AND oi.product_id = products.id
+)
+WHERE id IN (SELECT product_id FROM order_items WHERE order_id = 18);
+
+SELECT id,
+       name,
+       stock
+FROM products
+WHERE id IN (SELECT product_id FROM order_items WHERE order_id = 18)
+ORDER BY id;
+```
+</Playground>
+
+Đơn 18 có hai món: ly sứ men lam (mã 4) và Culi (mã 11), mỗi món 1. Tồn kho của ly sứ từ 60 xuống 59, của Culi từ 50 xuống 49; các sản phẩm khác không bị sửa vì không thỏa `WHERE`. Với mỗi hàng của `products` được sửa, truy vấn con tìm số lượng của **chính sản phẩm đó** trong đơn 18: `products.id` bên trong truy vấn con là cột `id` của hàng đang được sửa ở câu `UPDATE` bên ngoài. Bảng `products` ở đây không có bí danh (alias), nên ta gọi nó bằng tên bảng.
+
+`WHERE` ở cuối giới hạn việc sửa vào những sản phẩm có trong đơn 18. Nó cần thiết: với sản phẩm không có trong đơn, truy vấn con không tìm thấy hàng nào và trả về NULL, nên `stock - NULL` ra NULL.
+
+<Callout type="try">
+Bấm Khôi phục rồi xóa dòng `WHERE id IN (…)` của câu `UPDATE`, rồi thêm `;` ngay sau dấu `)` phía trên. Câu lệnh báo `NOT NULL constraint failed: products.stock`: mười sản phẩm không có trong đơn 18 sẽ nhận tồn kho NULL, cột `stock` không cho phép, nên cả câu bị hủy.
+</Callout>
+
+## Quên WHERE: sửa cả bảng
+
+`WHERE` trong `UPDATE` là **tùy chọn**. Bỏ nó đi thì câu lệnh vẫn hợp lệ, và sửa **mọi hàng**:
+
+<Playground>
+```sql
+-- Trà sen Tây Hồ (còn 8) vừa bán hết: định đặt tồn kho của nó về 0, nhưng quên WHERE
+UPDATE products
+SET stock = 0;
+
+SELECT COUNT(*) AS so_san_pham_het_hang
+FROM products
+WHERE stock = 0;
+```
+</Playground>
+
+Trước khi chạy chỉ có 2 sản phẩm hết hàng (bình giữ nhiệt, bánh pía); giờ cả **12** đều có tồn kho 0. Database không hỏi lại, không cảnh báo: với nó, "đặt tồn kho của mọi sản phẩm về 0" là một yêu cầu hợp lệ. Trong ô thực hành, bấm Khôi phục là xong. Trên database thật, dữ liệu cũ đã mất, trừ khi có bản sao lưu, hoặc câu lệnh nằm trong một transaction (giao dịch) chưa chốt (bài 30 sẽ dạy cách để có đường lui).
+
+Thói quen giúp tránh tai nạn này:
+
+1. Viết `WHERE` **trước**, rồi mới viết phần `UPDATE … SET` phía trên.
+2. Chạy `SELECT … WHERE` cùng điều kiện, xem số hàng.
+3. Chỉ khi số hàng đúng như mong đợi mới chạy `UPDATE`.
+
+## DELETE: xóa hàng
+
+`DELETE FROM bảng WHERE điều_kiện` xóa mọi hàng thỏa điều kiện. Không có danh sách cột, vì `DELETE` xóa **cả hàng**. Thử xóa đơn 4 (đơn đã hủy của Lê Bảo Ngọc):
+
+<Playground expect="error">
+```sql
+DELETE FROM orders
+WHERE id = 4;
+```
+</Playground>
+
+SQLite báo `FOREIGN KEY constraint failed`. Đơn 4 vẫn còn một hàng trong `order_items` (máy xay cà phê tay) trỏ tới nó qua khóa ngoại (foreign key) `order_items.order_id`. Xóa đơn 4 sẽ để lại một hàng chi tiết "mồ côi", trỏ tới một đơn không tồn tại, nên database từ chối. Đây là mặt còn lại của ràng buộc (constraint) khóa ngoại ở bài 15 và 24: không chỉ chặn **thêm** hàng trỏ vào chỗ không có, mà còn chặn **xóa** hàng đang được trỏ tới. (Ô thực hành đã bật kiểm tra khóa ngoại; SQLite mặc định thì không, như bài 15 đã nói.)
+
+Muốn xóa đơn 4, xóa phía "nhiều" trước, rồi mới xóa phía "một":
+
+<Playground>
+```sql
+-- Bước 1: xóa chi tiết của đơn 4
+DELETE FROM order_items
+WHERE order_id = 4;
+
+-- Bước 2: giờ mới xóa được đơn 4
+DELETE FROM orders
+WHERE id = 4;
+
+SELECT COUNT(*) AS so_don
+FROM orders;
+```
+</Playground>
+
+Còn 19 đơn. Bước 1 xóa một hàng của `order_items`, bước 2 xóa đơn 4. Thứ tự là bắt buộc: đảo lại thì bước xóa đơn vẫn bị từ chối như ô trước.
+
+Cũng vì vậy, xóa khách 1 (chị Hà) bị từ chối vì hai lý do: chị có đơn, và chị đã giới thiệu ba khách khác (`referred_by` trỏ tới chị). Bài 27 sẽ cho thấy có thể khai báo khóa ngoại để database **tự** xóa theo (`CASCADE`) hoặc đặt NULL cho hàng con, thay vì từ chối.
+
+<Callout type="try">
+Bấm Khôi phục, rồi thay hai câu `DELETE` bằng `DELETE FROM customers WHERE id = 8;` (Hoàng Mai Anh: chưa có đơn, chưa giới thiệu ai) và đổi câu cuối thành `SELECT COUNT(*) AS so_khach FROM customers;`. Câu xóa chạy được, còn 11 khách.
+</Callout>
+
+Giống `UPDATE`, `DELETE` không có `WHERE` xóa **mọi hàng** của bảng (nếu khóa ngoại cho phép). Thói quen chạy `SELECT` với cùng `WHERE` trước áp dụng y như vậy.
+
+## Bên trong database: UPDATE và DELETE làm gì
+
+`UPDATE` và `DELETE` đi qua hai bước giống `SELECT`: tìm những hàng thỏa `WHERE`, rồi sửa hoặc xóa từng hàng tìm được. Nếu cột trong `WHERE` có index (chỉ mục), database dùng nó để tìm nhanh (bài 31).
+
+ Ràng buộc của từng hàng (NOT NULL, CHECK) được kiểm khi sửa hàng đó, ví dụ giá mới có thỏa `CHECK (price > 0)` không; với khóa ngoại, việc tra bảng kia vẫn làm theo từng hàng như bài 24 nói, nhưng trên SQLite và PostgreSQL, quyết định báo lỗi đợi tới khi câu lệnh chạy xong, xem còn hàng nào ở bảng khác trỏ tới hàng đã xóa không. Chỉ cần một vi phạm là **cả câu lệnh** bị hủy, giống `INSERT` ở bài 24: không có chuyện sửa được nửa số hàng rồi dừng.
+
+Nhiều database không ghi đè hay xóa ngay tại chỗ mà giữ lại phiên bản cũ của hàng một lúc, để người khác đang đọc bảng cùng lúc vẫn thấy dữ liệu nhất quán; lộ trình PostgreSQL sẽ nói kỹ.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Quên WHERE">
+`UPDATE products SET stock = 0;` sửa mọi sản phẩm; `DELETE FROM order_items;` xóa mọi chi tiết đơn. Không có cảnh báo. Luôn viết `WHERE` trước và chạy `SELECT` với cùng `WHERE` để đếm số hàng sẽ bị ảnh hưởng.
+</Callout>
+
+<Callout type="warn" title="So với NULL bằng dấu bằng trong WHERE">
+`UPDATE orders SET status = 'đã hủy' WHERE shipped_on = NULL;` (định hủy mọi đơn chưa gửi) chạy không lỗi nhưng **không sửa hàng nào**, vì `shipped_on = NULL` không bao giờ đúng (bài 7). Viết `WHERE shipped_on IS NULL` thì khớp 5 đơn. Ngược lại, trong `SET` thì `phone = NULL` là đúng: đó là phép gán, không phải phép so sánh.
+</Callout>
+
+<Callout type="warn" title="Xóa hàng đang được trỏ tới">
+`DELETE FROM orders WHERE id = 4;` báo lỗi khóa ngoại vì `order_items` còn trỏ tới đơn 4. Xóa hàng ở bảng "nhiều" trước, rồi mới xóa hàng ở bảng "một". Thông báo trên PostgreSQL nói rõ bảng nào đang trỏ tới: `… violates foreign key constraint "order_items_order_id_fkey" on table "order_items"`.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| `UPDATE … SET … WHERE` | có | có | có |
+| `DELETE FROM … WHERE` | có | có | có |
+| Khóa ngoại chặn xóa hàng cha | khi đã bật kiểm tra | có | có (InnoDB) |
+| Chế độ chặn `UPDATE`/`DELETE` thiếu `WHERE` | không | không | có (`sql_safe_updates`) |
+
+MySQL có một chế độ an toàn (bật sẵn trong một số công cụ như MySQL Workbench) từ chối `UPDATE`/`DELETE` không lọc theo cột khóa (trừ khi có `LIMIT`). SQLite và PostgreSQL không có; bạn phải tự cẩn thận.
+
+## Tóm tắt
+
+- `UPDATE bảng SET cột = giá_trị, … WHERE điều_kiện` sửa mọi hàng thỏa điều kiện; giá trị mới có thể tính từ giá trị cũ (`price * 110 / 100`).
+- `DELETE FROM bảng WHERE điều_kiện` xóa mọi hàng thỏa điều kiện.
+- Thiếu `WHERE` thì sửa hoặc xóa **cả bảng**, không cảnh báo. Thói quen: viết `WHERE` trước, chạy `SELECT` với cùng `WHERE` để xem số hàng, rồi mới sửa hay xóa.
+- Khóa ngoại chặn xóa hàng đang được trỏ tới: xóa hàng con (`order_items`) trước, hàng cha (`orders`) sau.
+- So với NULL trong `WHERE` dùng `IS NULL`; trong `SET` thì `= NULL` là phép gán hợp lệ.
+
+## Bài tập
+
+<Exercise hint="Hai điều kiện: thành phố, và cột email đang là NULL (bài 7: so với NULL dùng gì?).">
+Khách ở **TP.HCM** chưa có email vừa cung cấp email **'huy.pham@example.com'** (chỉ có một khách như vậy). Cập nhật email cho đúng khách đó **mà không dùng mã khách**, rồi lấy mọi khách ở TP.HCM, gồm 2 cột theo thứ tự: tên, email; sắp theo mã khách.
+
+```sql
+UPDATE customers
+SET email = 'huy.pham@example.com'
+WHERE city = 'TP.HCM'
+  AND email IS NULL;
+
+SELECT name, email
+FROM customers
+WHERE city = 'TP.HCM'
+ORDER BY id;
+```
+</Exercise>
+
+<Exercise hint="Giá mới tính từ giá cũ; giữ số nguyên đồng bằng cách nhân rồi chia 100. Điều kiện nằm ở cột tồn kho. Bảng kết quả gồm cả sản phẩm không được giảm.">
+Cửa hàng **giảm giá 10%** cho những sản phẩm tồn kho **trên 100** (vẫn là số nguyên đồng). Cập nhật, rồi lấy **mọi** sản phẩm danh mục **Dụng cụ** và **Bánh** (cả những sản phẩm không được giảm), gồm 2 cột theo thứ tự: tên, giá; sắp theo mã sản phẩm.
+
+```sql
+UPDATE products
+SET price = price * 90 / 100
+WHERE stock > 100;
+
+SELECT name, price
+FROM products
+WHERE category IN ('Dụng cụ', 'Bánh')
+ORDER BY id;
+```
+</Exercise>
+
+<Exercise hint="Chạy thử và xem bảng kết quả: có bao nhiêu đơn bị sửa? Câu UPDATE đang thiếu gì?" starter={"UPDATE orders\nSET status = 'đang giao',\n    shipped_on = '2025-11-20';\n\nSELECT id,\n       status,\n       shipped_on\nFROM orders\nWHERE id >= 15\nORDER BY id;\n"}>
+Câu lệnh có sẵn trong ô muốn ghi nhận **chỉ đơn 18** được gửi đi ngày '2025-11-20' (trạng thái thành 'đang giao'), rồi xem các đơn từ mã 15 trở đi. Nhưng kết quả cho thấy có gì đó sai. Hãy sửa cho đúng; kết quả cuối gồm 3 cột: mã đơn, trạng thái, ngày gửi; sắp theo mã đơn.
+
+```sql
+UPDATE orders
+SET status = 'đang giao',
+    shipped_on = '2025-11-20'
+WHERE id = 18;
+
+SELECT id,
+       status,
+       shipped_on
+FROM orders
+WHERE id >= 15
+ORDER BY id;
+```
+</Exercise>
+
+<Exercise hint="Khóa ngoại: xóa chi tiết của các đơn đã hủy trước (truy vấn con cho danh sách mã đơn), rồi mới xóa các đơn đó. Bảng kết quả đếm cả số món còn lại, nên đừng xóa thừa.">
+Cửa hàng muốn **xóa hẳn mọi đơn đã hủy** cùng chi tiết của chúng, và chỉ chúng. Sau đó, với mỗi trạng thái còn lại, đếm số đơn và số món (số hàng chi tiết trong `order_items`). Kết quả cuối gồm 3 cột theo thứ tự: trạng thái, số đơn, số món; sắp theo trạng thái.
+
+```sql
+DELETE FROM order_items
+WHERE order_id IN (SELECT id FROM orders WHERE status = 'đã hủy');
+
+DELETE FROM orders
+WHERE status = 'đã hủy';
+
+SELECT o.status,
+       COUNT(DISTINCT o.id) AS so_don,
+       COUNT(oi.product_id) AS so_mon
+FROM orders AS o
+LEFT JOIN order_items AS oi
+  ON oi.order_id = o.id
+GROUP BY o.status
+ORDER BY o.status;
+```
+</Exercise>
+
+<Exercise hint="Truy vấn con tương quan trong SET, như ví dụ đơn 18; nhưng lần này một sản phẩm có thể nằm trong nhiều đơn chờ xác nhận, và truy vấn con chỉ được trả về một giá trị.">
+Cửa hàng **nhập thêm hàng** từ nhà cung cấp, vừa đủ cho các đơn đang chờ xác nhận: cộng vào `stock` của mỗi sản phẩm **tổng số lượng** của nó trong tất cả các đơn chờ xác nhận. Viết **một** câu `UPDATE` (không đổi trạng thái đơn), rồi lấy các sản phẩm có trong những đơn đó, gồm 3 cột theo thứ tự: mã, tên, tồn kho; sắp theo mã.
+
+```sql
+UPDATE products
+SET stock = stock + (
+  SELECT SUM(oi.quantity)
+  FROM order_items AS oi
+  INNER JOIN orders AS o
+    ON o.id = oi.order_id
+  WHERE o.status = 'chờ xác nhận'
+    AND oi.product_id = products.id
+)
+WHERE id IN (
+  SELECT oi.product_id
+  FROM order_items AS oi
+  INNER JOIN orders AS o
+    ON o.id = oi.order_id
+  WHERE o.status = 'chờ xác nhận'
+);
+
+SELECT id,
+       name,
+       stock
+FROM products
+WHERE id IN (
+  SELECT oi.product_id
+  FROM order_items AS oi
+  INNER JOIN orders AS o
+    ON o.id = oi.order_id
+  WHERE o.status = 'chờ xác nhận'
+)
+ORDER BY id;
+```
+</Exercise>
+
+Đến đây bạn đã đọc, thêm, sửa, xóa dữ liệu trong những bảng có sẵn. Bài tiếp theo bắt đầu phần thiết kế: tự tạo bảng với `CREATE TABLE` và chọn kiểu dữ liệu (data type) cho từng cột.

@@ -1,0 +1,334 @@
+---
+title: CTE với WITH
+description: Đặt tên cho từng bước trung gian bằng WITH để viết truy vấn nhiều tầng như một chuỗi bước đọc từ trên xuống, dùng lại một bước nhiều lần, và nối nhiều CTE với nhau.
+order: 22
+---
+
+Ở bài 19, để biết "có bao nhiêu khách đặt 1 đơn, 2 đơn…", bạn đặt cả một câu `SELECT … GROUP BY` vào trong `FROM` của câu khác. Ở bài 21, câu lệnh (statement) thay `FULL JOIN` lồng một phép `UNION` vào trong `FROM`. Những câu lệnh đó chạy đúng, nhưng phải đọc **từ trong ra ngoài**: tìm truy vấn con (subquery) sâu nhất, hiểu nó, rồi mới hiểu câu bao bên ngoài. Thêm một tầng nữa là khó theo dõi.
+
+Bài này giới thiệu CTE (common table expression), viết bằng từ khóa (keyword) `WITH`: đặt tên cho từng bước trung gian ở **đầu** câu lệnh, rồi dùng tên đó như một bảng (table). Câu lệnh nhiều tầng trở thành một chuỗi bước đọc từ trên xuống. Bài 18 và 19 đã hẹn cách viết này.
+
+## WITH: đặt tên cho một bước trung gian
+
+Đây là câu "gom hai lần" của bài 19, viết lại bằng `WITH`:
+
+<Playground>
+```sql
+WITH don_moi_khach AS (
+  SELECT customer_id,
+         COUNT(*) AS so_don
+  FROM orders
+  GROUP BY customer_id
+)
+SELECT so_don,
+       COUNT(*) AS so_khach
+FROM don_moi_khach
+GROUP BY so_don
+ORDER BY so_don;
+```
+</Playground>
+
+Kết quả (result set) giống hệt bài 19: hai khách đặt 1 đơn, bốn khách đặt 2 đơn, hai khách đặt 3 đơn, một khách đặt 4 đơn. Chỉ cách viết thay đổi:
+
+- `WITH don_moi_khach AS ( … )` định nghĩa một CTE tên `don_moi_khach`. Phần trong ngoặc là một câu `SELECT` bình thường, ở đây là số đơn của mỗi khách, gồm 9 hàng (row).
+- Câu `SELECT` chính phía sau dùng `don_moi_khach` trong `FROM` y như một bảng có thật, với hai cột (column) `customer_id` và `so_don`.
+
+Đọc từ trên xuống: **bước 1**, tính số đơn mỗi khách; **bước 2**, đếm số khách theo số đơn. Tên CTE nói lên ý nghĩa của bước, nên người đọc không phải giải mã một khối ngoặc lồng nhau. Cột tính toán trong CTE, như `so_don`, cần bí danh (alias) để bên ngoài gọi được, giống truy vấn con trong `FROM` ở bài 19.
+
+CTE chỉ tồn tại **trong câu lệnh này**. Nó không được lưu vào database: câu lệnh kết thúc là CTE biến mất.
+
+### Dùng CTE như một bảng: nối với bảng khác
+
+Vì CTE dùng được như bảng, bạn có thể nối nó với bảng khác. Bài 20 tìm "sản phẩm đắt hơn trung bình của danh mục" bằng truy vấn con tương quan (correlated subquery). Với CTE, ta tính trung bình mỗi danh mục **một lần**, rồi nối vào:
+
+<Playground>
+```sql
+WITH tb_danh_muc AS (
+  SELECT category,
+         AVG(price) AS gia_tb
+  FROM products
+  GROUP BY category
+)
+SELECT p.name,
+       p.category,
+       p.price,
+       ROUND(t.gia_tb) AS gia_tb
+FROM products AS p
+INNER JOIN tb_danh_muc AS t
+  ON t.category = p.category
+WHERE p.price > t.gia_tb
+ORDER BY p.category, p.name;
+```
+</Playground>
+
+Cùng 6 sản phẩm như bài 20: bánh pía, Arabica, Culi, bình giữ nhiệt, máy xay, trà sen. Nhưng lần này kết quả có thêm cột `gia_tb` (đã làm tròn), cho thấy mỗi sản phẩm được so với con số nào: bánh pía (75000) so với 65000, Culi (145000) so với 143333, chỉ nhỉnh hơn chút ít. Truy vấn con tương quan ở bài 20 không đưa được con số đó ra kết quả nếu không viết lại truy vấn con lần nữa trong `SELECT`.
+
+## Dùng lại một CTE nhiều lần
+
+Một CTE đã đặt tên có thể dùng **nhiều lần** trong cùng câu lệnh. Ví dụ: khách nào có nhiều đơn nhất?
+
+<Playground>
+```sql
+WITH don_moi_khach AS (
+  SELECT customer_id,
+         COUNT(*) AS so_don
+  FROM orders
+  GROUP BY customer_id
+)
+SELECT c.name, d.so_don
+FROM don_moi_khach AS d
+INNER JOIN customers AS c
+  ON c.id = d.customer_id
+WHERE d.so_don = (SELECT MAX(so_don) FROM don_moi_khach);
+```
+</Playground>
+
+Chị Hà, 4 đơn. `don_moi_khach` được dùng hai lần: một lần trong `FROM` (để có từng khách), một lần trong truy vấn con của `WHERE` (để có số đơn lớn nhất). Không có CTE, bạn phải viết câu `SELECT … GROUP BY customer_id` hai lần, và nếu sau này sửa một chỗ (ví dụ chỉ đếm đơn đã giao) thì phải nhớ sửa cả chỗ kia.
+
+Cách làm này cũng xử lý đúng trường hợp hòa: nếu hai khách cùng có số đơn lớn nhất, cả hai đều được giữ. `ORDER BY so_don DESC LIMIT 1` (bài 9) chỉ giữ một người và bỏ người kia không báo trước.
+
+## Nhiều CTE nối tiếp nhau
+
+`WITH` nhận nhiều CTE, **cách nhau bằng dấu phẩy**, và CTE sau được dùng CTE trước. Mỗi CTE là một bước:
+
+<Playground>
+```sql
+WITH tien_moi_don AS (
+  SELECT order_id,
+         SUM(quantity * unit_price) AS tong_tien
+  FROM order_items
+  GROUP BY order_id
+),
+don_da_giao AS (
+  SELECT t.order_id,
+         t.tong_tien,
+         o.customer_id
+  FROM tien_moi_don AS t
+  INNER JOIN orders AS o
+    ON o.id = t.order_id
+  WHERE o.status = 'đã giao'
+)
+SELECT c.name,
+       COUNT(*) AS so_don,
+       SUM(d.tong_tien) AS tong_chi,
+       MAX(d.tong_tien) AS don_lon_nhat
+FROM don_da_giao AS d
+INNER JOIN customers AS c
+  ON c.id = d.customer_id
+GROUP BY c.id, c.name
+HAVING COUNT(*) >= 2
+ORDER BY tong_chi DESC;
+```
+</Playground>
+
+Ba khách có từ 2 đơn đã giao trở lên: chị Hà (3 đơn, tổng 960000, đơn lớn nhất 390000), Đặng Gia Linh (2 đơn, 869000, đơn lớn nhất 449000), Trần Minh Khoa (2 đơn, 633000, đơn lớn nhất 343000). Ba bước:
+
+1. `tien_moi_don`: tổng tiền của mỗi đơn, từ `order_items` (20 hàng).
+2. `don_da_giao`: dùng bước 1, nối với `orders` để biết trạng thái và khách, chỉ giữ đơn đã giao (12 hàng).
+3. Câu chính: dùng bước 2, gom theo khách.
+
+Câu "đơn lớn nhất của mỗi khách" cần **tổng tiền của từng đơn** trước rồi mới lấy `MAX`; nếu nối thẳng `order_items` thì `MAX` sẽ lấy hàng `order_items` (một sản phẩm trong một đơn) có giá trị lớn nhất chứ không phải đơn lớn nhất: Đặng Gia Linh sẽ ra 360000 thay vì 449000. Tách thành bước giúp tránh nhầm như vậy, và mỗi bước có thể chạy thử riêng: chép phần trong ngoặc của `tien_moi_don` ra chạy một mình để kiểm tra trước khi đi tiếp. Muốn kiểm tra bước sau, giữ nguyên phần `WITH` tới bước đó và thay câu chính bằng `SELECT order_id, tong_tien, customer_id FROM don_da_giao;`, vì `don_da_giao` đọc từ `tien_moi_don`, chép riêng nó ra sẽ báo `no such table`.
+
+Về trình bày: mỗi CTE là một khối `tên AS (` … `)`, nội dung thụt vào 2 dấu cách; dấu phẩy ngăn cách đặt ngay sau ngoặc đóng; câu `SELECT` chính bắt đầu ở đầu dòng.
+
+### Viết lại câu thay FULL JOIN của bài 21
+
+Câu thay `FULL JOIN` ở bài 21 lồng một phép `UNION` vào trong `FROM`. Với CTE, mỗi phần có tên riêng, và CTE `gop` dùng hai CTE trước nó:
+
+<Playground>
+```sql
+WITH trai AS (
+  SELECT c.id AS ma_khach,
+         c.name,
+         o.id AS ma_don
+  FROM customers AS c
+  LEFT JOIN orders AS o
+    ON o.customer_id = c.id
+),
+phai AS (
+  SELECT c.id AS ma_khach,
+         c.name,
+         o.id AS ma_don
+  FROM orders AS o
+  LEFT JOIN customers AS c
+    ON o.customer_id = c.id
+),
+gop AS (
+  SELECT ma_khach,
+         name,
+         ma_don
+  FROM trai
+  UNION
+  SELECT ma_khach,
+         name,
+         ma_don
+  FROM phai
+)
+SELECT COUNT(*) AS so_hang
+FROM gop;
+```
+</Playground>
+
+Vẫn 23 hàng như bài 21. Đọc từ trên xuống: `trai` là `LEFT JOIN` theo chiều khách → đơn, `phai` là chiều ngược lại, `gop` ghép hai chiều, câu chính đếm. Bài 21 cũng khuyên tách từng bước khi trộn `UNION` với `INTERSECT`; CTE là cách tách đó: mỗi phép tập hợp (set operation) nằm trong một CTE riêng, nên thứ tự thực hiện rõ ràng trên mọi database.
+
+## Bên trong database: CTE có được lưu tạm không?
+
+CTE là cách **viết**, không phải một chỉ dẫn về cách **chạy**. Database có thể:
+
+- coi CTE như một truy vấn con và gộp vào câu chính (inline), rồi tối ưu cả câu như thể bạn đã viết lồng nhau; hoặc
+- chạy CTE một lần, lưu kết quả tạm, rồi đọc lại mỗi khi được dùng (materialize).
+
+PostgreSQL từ bản 12 mặc định gộp CTE được dùng một lần vào câu chính, và lưu tạm CTE được dùng nhiều lần; bạn có thể ép bằng `AS MATERIALIZED` hoặc `AS NOT MATERIALIZED`. SQLite cũng tự chọn. Với dữ liệu nhỏ như cửa hàng này, khác biệt không đáng kể. Điều quan trọng: viết CTE để câu lệnh **dễ đọc**, và đừng mặc định nó chậm hơn hay nhanh hơn truy vấn con.
+
+`WITH` còn có một dạng đặc biệt, `WITH RECURSIVE`, cho phép CTE tự gọi lại chính nó, ví dụ để đi theo chuỗi giới thiệu 1 → 6 → 9 tới hết. Lộ trình PostgreSQL (bài "CTE đệ quy") sẽ dạy dạng này.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Thiếu hoặc thừa dấu phẩy giữa các CTE">
+Các CTE cách nhau bằng dấu phẩy, nhưng **không** có dấu phẩy trước câu `SELECT` chính. Thiếu dấu phẩy giữa hai CTE (`WITH a AS (…) b AS (…)`) báo `near "b": syntax error`; thừa dấu phẩy sau CTE cuối (`WITH a AS (…), SELECT …`) báo `near "SELECT": syntax error`.
+</Callout>
+
+<Callout type="warn" title="Dùng CTE ở câu lệnh khác">
+CTE chỉ sống trong câu lệnh chứa nó. Viết `WITH t AS (…) SELECT …;` rồi ở câu lệnh sau `SELECT so_don FROM t` sẽ báo `no such table: t`. Muốn lưu một truy vấn để dùng lại lâu dài, bài 32 sẽ giới thiệu view.
+</Callout>
+
+<Callout type="warn" title="CTE trùng tên với bảng có thật">
+Đặt CTE tên `orders` thì trong câu lệnh đó, `orders` chỉ CTE chứ không còn chỉ bảng thật nữa. Nếu CTE có đủ các cột câu lệnh dùng tới thì không có lỗi nào báo: câu lệnh lặng lẽ đọc CTE thay cho bảng thật. Nếu thiếu cột, bạn sẽ gặp `no such column`, một thông báo dễ gây bối rối. Đặt tên CTE theo ý nghĩa của bước (`don_da_giao`, `tien_moi_don`), khác tên bảng. Nếu CTE tên `orders` lại đọc từ chính `orders`, SQLite báo `circular reference: orders`, còn PostgreSQL hiểu `orders` bên trong là bảng thật.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| `WITH` (CTE) | có | có | có (từ bản 8.0) |
+| Nhiều CTE, CTE sau dùng CTE trước | có | có | có |
+| `AS MATERIALIZED` / `NOT MATERIALIZED` | có (từ bản 3.35) | có (từ bản 12) | không |
+| `WITH RECURSIVE` | có | có | có (từ bản 8.0) |
+
+MySQL 5.7 trở về trước không có `WITH`. Nếu gặp hệ thống cũ, bạn phải viết lại thành truy vấn con trong `FROM` như bài 19.
+
+## Tóm tắt
+
+- `WITH tên AS (SELECT …) SELECT …` đặt tên cho một bước trung gian; câu chính dùng tên đó như một bảng, kể cả để nối với bảng khác.
+- Nhiều CTE cách nhau bằng dấu phẩy (không có dấu phẩy trước câu chính); CTE sau dùng được CTE trước. Câu lệnh nhiều tầng thành chuỗi bước đọc từ trên xuống.
+- Một CTE dùng lại được nhiều lần trong cùng câu lệnh (ví dụ trong `FROM` và trong truy vấn con), tránh viết lặp.
+- CTE chỉ tồn tại trong câu lệnh chứa nó; đặt tên khác bảng có thật.
+- Database tự chọn gộp CTE vào câu chính hay lưu tạm; viết CTE để dễ đọc, không phải để nhanh hơn.
+
+## Bài tập
+
+<Exercise hint="Bước 1 (CTE): tổng số lượng đã đặt của mỗi sản phẩm. Bước 2: lọc trên kết quả của bước 1.">
+Dùng `WITH`, tìm những sản phẩm có **tổng số lượng đã đặt từ 6 trở lên** (tính trên mọi hàng của `order_items`). Kết quả gồm 2 cột theo thứ tự: mã sản phẩm, tổng số lượng.
+
+```sql
+WITH so_luong AS (
+  SELECT product_id,
+         SUM(quantity) AS tong
+  FROM order_items
+  GROUP BY product_id
+)
+SELECT product_id, tong
+FROM so_luong
+WHERE tong >= 6;
+```
+</Exercise>
+
+<Exercise hint="Gom hai lần: CTE tính tổng số lượng đã đặt của mỗi sản phẩm; câu chính nối với products để biết danh mục, giữ sản phẩm đạt ngưỡng, rồi đếm theo danh mục.">
+Dùng `WITH`, đếm xem **mỗi danh mục** có bao nhiêu sản phẩm có **tổng số lượng đã đặt từ 4 trở lên** (tính trên mọi hàng của `order_items`). Kết quả gồm 2 cột theo thứ tự: danh mục, số sản phẩm; sắp theo danh mục.
+
+```sql
+WITH so_luong AS (
+  SELECT product_id,
+         SUM(quantity) AS tong
+  FROM order_items
+  GROUP BY product_id
+)
+SELECT p.category,
+       COUNT(*) AS so_san_pham
+FROM so_luong AS sl
+INNER JOIN products AS p
+  ON p.id = sl.product_id
+WHERE sl.tong >= 4
+GROUP BY p.category
+ORDER BY p.category;
+```
+</Exercise>
+
+<Exercise hint="Chạy thử và đọc thông báo lỗi. Hai CTE phải được ngăn cách bằng gì?" starter={"WITH don_huy AS (\n  SELECT customer_id\n  FROM orders\n  WHERE status = 'đã hủy'\n)\ndon_giao AS (\n  SELECT customer_id\n  FROM orders\n  WHERE status = 'đã giao'\n)\nSELECT customer_id\nFROM don_huy\nINTERSECT\nSELECT customer_id\nFROM don_giao;\n"}>
+Câu lệnh có sẵn trong ô muốn tìm khách **vừa có đơn đã hủy, vừa có đơn đã giao** (như bài 21), viết bằng hai CTE, nhưng báo lỗi cú pháp. Hãy sửa cho đúng, kết quả gồm 1 cột: mã khách.
+
+```sql
+WITH don_huy AS (
+  SELECT customer_id
+  FROM orders
+  WHERE status = 'đã hủy'
+),
+don_giao AS (
+  SELECT customer_id
+  FROM orders
+  WHERE status = 'đã giao'
+)
+SELECT customer_id
+FROM don_huy
+INTERSECT
+SELECT customer_id
+FROM don_giao;
+```
+</Exercise>
+
+<Exercise hint="Một CTE: mỗi đơn chưa hoàn tất kèm tên khách và tổng tiền (nối orders, customers, order_items rồi gom theo đơn). Câu chính dùng CTE đó hai lần.">
+Trong các đơn **chưa hoàn tất** (trạng thái `đang giao` hoặc `chờ xác nhận`), đơn nào có **giá trị lớn nhất** theo giá lúc bán, và của khách nào? Nếu có nhiều đơn hòa nhau thì lấy hết. Kết quả gồm 3 cột theo thứ tự: mã đơn, tên khách, giá trị đơn.
+
+```sql
+WITH don_chua_xong AS (
+  SELECT o.id,
+         c.name,
+         SUM(oi.quantity * oi.unit_price) AS tong_tien
+  FROM orders AS o
+  INNER JOIN customers AS c
+    ON c.id = o.customer_id
+  INNER JOIN order_items AS oi
+    ON oi.order_id = o.id
+  WHERE o.status IN ('đang giao', 'chờ xác nhận')
+  GROUP BY o.id, c.name
+)
+SELECT id,
+       name,
+       tong_tien
+FROM don_chua_xong
+WHERE tong_tien = (SELECT MAX(tong_tien) FROM don_chua_xong);
+```
+</Exercise>
+
+<Exercise hint="Hai CTE độc lập: một CTE tính tổng chi theo khách (nối orders với order_items), một CTE đếm người được giới thiệu theo người giới thiệu. Câu chính đi từ customers, LEFT JOIN cả hai, đổi NULL thành 0. Bài 18 đã cho thấy nối thẳng hai nhánh thì SUM bị nhân lên.">
+Với **mọi** khách, cho biết **tổng chi** theo giá lúc bán (tính mọi trạng thái đơn, kể cả đơn đã hủy) và **số người** khách đó đã giới thiệu; khách không có thì hiện 0. Kết quả gồm 3 cột theo thứ tự: tên khách, tổng chi, số người giới thiệu; sắp theo mã khách tăng dần.
+
+```sql
+WITH chi_tieu AS (
+  SELECT o.customer_id,
+         SUM(oi.quantity * oi.unit_price) AS tong_chi
+  FROM orders AS o
+  INNER JOIN order_items AS oi
+    ON oi.order_id = o.id
+  GROUP BY o.customer_id
+),
+gioi_thieu AS (
+  SELECT referred_by,
+         COUNT(*) AS so_nguoi
+  FROM customers
+  WHERE referred_by IS NOT NULL
+  GROUP BY referred_by
+)
+SELECT c.name,
+       COALESCE(t.tong_chi, 0) AS tong_chi,
+       COALESCE(g.so_nguoi, 0) AS so_nguoi_gioi_thieu
+FROM customers AS c
+LEFT JOIN chi_tieu AS t
+  ON t.customer_id = c.id
+LEFT JOIN gioi_thieu AS g
+  ON g.referred_by = c.id
+ORDER BY c.id;
+```
+</Exercise>
+
+Bài tiếp theo giới thiệu window function (hàm cửa sổ): đặt trung bình danh mục cạnh từng sản phẩm, hay đánh số lần đặt của mỗi khách, mà không phải tính riêng rồi nối lại.

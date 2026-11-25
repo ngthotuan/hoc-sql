@@ -91,7 +91,7 @@ SELECT name FROM products;
 
 - **Không** truyền SQL qua thuộc tính `code={...}`: MDX sẽ xóa thụt lề.
 - `<Exercise>` chấm bằng cách so **kết quả** (không so chữ), bỏ qua tên cột; chỉ so thứ tự hàng khi lời giải có `ORDER BY` ở cấp ngoài cùng. Vì vậy đề bài cần ORDER BY thì phải nói rõ thứ tự; đề bài không yêu cầu thứ tự thì lời giải đừng có ORDER BY.
-- Bài tập phải là câu SELECT (component so sánh bảng kết quả cuối cùng).
+- Bài tập kết thúc bằng một câu SELECT (component so sánh bảng kết quả cuối cùng). Bài tập về thay đổi dữ liệu (INSERT, UPDATE, DELETE) được phép có các câu đó trước SELECT: trình chấm tự khôi phục dữ liệu gốc trước mỗi lần chạy. Câu SELECT cuối phải lộ ra **mọi giá trị** người học tự nhập hoặc sửa, nếu không giá trị sai vẫn được chấm đúng.
 - Bảng Markdown tự cuộn ngang trên điện thoại, không cần xử lý thêm.
 - Code tĩnh (không chạy được, ví dụ cú pháp riêng của MySQL) dùng khối ` ```sql ` thường, và **ghi rõ đây là ví dụ** kèm kết quả mẫu.
 - Không nhắc tới phím tắt cụ thể (Ctrl/⌘) trong bài; nút Chạy tự hiển thị phím tắt đúng với máy.

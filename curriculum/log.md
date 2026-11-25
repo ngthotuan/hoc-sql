@@ -14,6 +14,22 @@ Nhật ký giúp lần viết sau nắm được bối cảnh: đã quyết đ�
 
 ---
 
+## 2026-11-26: basics/21–25 (UNION, CTE, window function, INSERT, UPDATE/DELETE)
+- Đã làm: 21 phép tập hợp (PASS vòng 4), 22 CTE (PASS vòng 3), 23 window function (PASS vòng 4), 24 INSERT (PASS vòng 3), 25 UPDATE/DELETE (PASS vòng 6: các vòng lần lượt bắt ví dụ ghi đè shipped_on, bài tập chấm đúng cả lời giải quên WHERE/xóa thừa, tình huống nhập kho phi logic). Bài 21, 23 vượt quy tắc 3 vòng: MAJOR còn lại là đề có điều kiện thừa (21) và cấu trúc bài (23), sửa dứt điểm nên tiếp tục.
+- Một số reviewer bị ngắt do hết hạn mức (rate limit); tiếp tục bằng SendMessage tới chính agent đó, không phải chạy lại từ đầu.
+- Công cụ:
+  - `Exercise.tsx`: lời giải có INSERT/UPDATE/DELETE/CREATE/ALTER/DROP thì khôi phục dữ liệu gốc (`session.reset()`) trước khi chạy câu của người học. Bài tập thay đổi dữ liệu kết thúc bằng SELECT lộ ra mọi giá trị người học nhập (style-guide mục 5 đã cập nhật).
+  - `npm run validate` thêm cảnh báo: đề nói tới "đơn" mà không nêu trạng thái (lời giải đọc `orders` mà không lọc `status`); dòng bắt đầu bằng `SELECT` (viết hoa) chứa luôn `FROM`; phép thử "chỉ giữ một vế của UNION" (vế kia thừa).
+  - Phép thử mới: với lời giải có UPDATE/DELETE, bỏ WHERE của từng câu; kết quả cuối không đổi → SELECT cuối không lộ hàng bị sửa thừa.
+  - Đã thêm "tính mọi trạng thái" vào đề ở bài 11, 16, 17, 18, 21, 23 (lời giải không đổi).
+- Quyết định nội dung:
+  - Phép tập hợp: SQLite làm UNION/INTERSECT trái sang phải và không cho ngoặc quanh SELECT; PostgreSQL ưu tiên INTERSECT. ORDER BY sau phép tập hợp không nhận biểu thức; PostgreSQL không nhận tên có tiền tố bảng. Phép tập hợp coi NULL bằng nhau.
+  - CTE: SQLite báo `circular reference` khi CTE trùng tên đọc chính bảng đó; PostgreSQL hiểu là bảng thật. AS MATERIALIZED (SQLite 3.35+, PG 12+).
+  - Window function: ROW_NUMBER khi hòa khác nhau giữa SQLite và PostgreSQL; cửa sổ chỉ thấy hàng đã qua WHERE; RANK() OVER (ORDER BY SUM(…)) sau GROUP BY không phải lồng hàm tổng hợp.
+  - INSERT: PostgreSQL bỏ danh sách cột thì điền các cột đầu, có thể chạy thành công; SQLite nhận chữ vào cột số. Bỏ id: SQLite tự cấp, PostgreSQL lỗi.
+  - UPDATE/DELETE: không ghi đè dữ liệu đúng (shipped_on là ngày gửi, không phải ngày nhận); truy vấn con tương quan trong SET nhắc bảng ngoài bằng tên bảng và cần WHERE (không thì NULL → lỗi NOT NULL).
+- Cần lưu ý cho bài sau (basics/26 CREATE TABLE): bài 10 hẹn lưu tiền bằng số nguyên/DECIMAL; bài 24 hẹn cột tự tăng ở lộ trình PostgreSQL/MySQL (không phải bài 26); bài 27 hẹn DEFAULT, CASCADE, PRAGMA foreign_keys, NULL trong khóa chính SQLite.
+
 ## 2026-11-26: Xong basics/16–20; mục lục cuộn được
 - Đã làm: 16 INNER JOIN (PASS vòng 2), 17 LEFT/RIGHT/FULL JOIN (PASS vòng 5), 18 nối nhiều bảng + tự nối + CROSS JOIN (PASS vòng 2), 19 truy vấn con (PASS vòng 3), 20 EXISTS + truy vấn con tương quan (PASS vòng 3) → `done`, có recap.
 - basics/17 vượt quy tắc 3 vòng (5 vòng): các MAJOR còn lại đều là câu chữ/giải thích (thiếu "vì sao" điều kiện bảng trái phải ở WHERE; đề "mỗi thành phố bao nhiêu đơn" không nói trạng thái). Mỗi vòng sửa dứt điểm nên tiếp tục thay vì dừng.

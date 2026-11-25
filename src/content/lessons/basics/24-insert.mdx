@@ -1,0 +1,288 @@
+---
+title: Thêm dữ liệu với INSERT
+description: Thêm một hàng và nhiều hàng vào bảng bằng INSERT INTO … VALUES, luôn ghi rõ danh sách cột, thêm hàng từ kết quả một câu SELECT, và đọc hiểu lỗi khi dữ liệu vi phạm ràng buộc.
+order: 24
+---
+
+Từ bài 1 tới bài 23, mọi câu lệnh (statement) chỉ **đọc** dữ liệu: dù phức tạp tới đâu, bảng (table) vẫn y nguyên sau khi chạy. Nhưng cửa hàng thì không đứng yên: có khách mới đăng ký, có sản phẩm mới về, có đơn mới được đặt. Những hàng (row) đó phải được **thêm** vào database.
+
+Bài này giới thiệu `INSERT`, câu lệnh đầu tiên **thay đổi** dữ liệu. Bạn sẽ thêm một hàng, nhiều hàng, thêm từ kết quả một câu `SELECT`, và đọc các lỗi database đưa ra khi dữ liệu mới vi phạm quy tắc của bảng. Bài 15 đã nhắc tới những lỗi này mà chưa cho bạn tự gây ra; giờ bạn sẽ thấy chúng tận mắt.
+
+<Callout type="note" title="Dữ liệu trong ô thực hành không bị hỏng">
+Mỗi ô thực hành có database riêng, chỉ sống trong trình duyệt của bạn. Thêm, sửa gì cũng không ảnh hưởng tới ô khác hay bài khác. Nút **Khôi phục** đưa ô đó về dữ liệu gốc của cửa hàng và câu lệnh ban đầu (mọi chỉnh sửa trong ô sẽ mất). Nút **Kiểm tra** ở phần bài tập cũng tự khôi phục dữ liệu gốc trước mỗi lần chấm.
+</Callout>
+
+## Thêm một hàng: INSERT INTO … VALUES
+
+<Playground>
+```sql
+INSERT INTO customers (id, name, city, joined_on)
+VALUES (13, 'Mai Thu Trang', 'Huế', '2025-11-20');
+
+SELECT id,
+       name,
+       city,
+       email,
+       phone,
+       referred_by,
+       joined_on
+FROM customers
+WHERE id = 13;
+```
+</Playground>
+
+Ô có hai câu lệnh. Câu `INSERT` không trả về bảng kết quả (result set) nào; nó thêm một hàng vào `customers`. Câu `SELECT` sau đó đọc lại hàng vừa thêm: khách 13, Mai Thu Trang, ở Huế, đăng ký ngày 2025-11-20. Ba cột (column) `email`, `phone`, `referred_by` là **NULL**: câu `INSERT` không nhắc tới chúng, nên database điền giá trị mặc định, và mặc định của các cột này là NULL (bài 27 sẽ dạy cách đặt mặc định khác).
+
+Đọc câu lệnh:
+
+- `INSERT INTO customers`: thêm vào bảng `customers`.
+- `(id, name, city, joined_on)`: danh sách **cột** sẽ được điền, theo thứ tự này.
+- `VALUES (13, 'Mai Thu Trang', 'Huế', '2025-11-20')`: các **giá trị**, theo đúng thứ tự của danh sách cột. Giá trị thứ nhất vào `id`, thứ hai vào `name`… Chuỗi và ngày dùng nháy đơn, như bài 4.
+
+Chạy lại ô một lần nữa (không bấm Khôi phục) sẽ báo lỗi, vì đã có khách mã 13. Phần cuối bài nói về lỗi này.
+
+### Luôn ghi rõ danh sách cột
+
+SQL cho phép bỏ danh sách cột: `INSERT INTO customers VALUES (…)`. Khi đó các giá trị được điền theo đúng thứ tự cột lúc tạo bảng. SQLite và MySQL đòi đủ giá trị cho **mọi** cột; PostgreSQL điền vào các cột đầu tiên, các cột còn lại nhận giá trị mặc định. Thử bỏ danh sách cột ở câu trên:
+
+<Playground expect="error">
+```sql
+INSERT INTO customers
+VALUES (13, 'Mai Thu Trang', 'Huế', '2025-11-20');
+```
+</Playground>
+
+SQLite từ chối: `table customers has 7 columns but 4 values were supplied`. Bảng có 7 cột, câu lệnh cho 4 giá trị.
+
+PostgreSQL còn nguy hiểm hơn: nó đặt 4 giá trị vào **4 cột đầu** (`id`, `name`, `city`, `email`), tức là đặt chữ "2025-11-20" vào cột email, và chỉ báo lỗi vì `joined_on` (không được NULL) bị bỏ trống. Nếu cột bị bỏ được phép NULL, câu lệnh **chạy thành công**: ví dụ `INSERT INTO orders VALUES (21, 7, '2025-11-20', 'chờ xác nhận')` thêm được đơn 21 trên PostgreSQL (cột `shipped_on` cuối cùng nhận NULL), trong khi SQLite báo lỗi.
+
+Còn nếu đủ số giá trị nhưng sai thứ tự, trên SQLite dữ liệu gần như luôn vào **sai cột** mà không lỗi nào báo, vì SQLite nhận cả chữ vào cột số (bài 1): `INSERT INTO products VALUES (13, 'Trà', 90000, 'Trà gừng', 40)` thêm được một sản phẩm tên "Trà", danh mục 90000, giá "Trà gừng". PostgreSQL chỉ báo lỗi khi giá trị không đổi được sang kiểu dữ liệu (data type) của cột (ở đây: `invalid input syntax for type integer: "Trà gừng"`).
+
+Quy tắc của khóa học: **luôn** ghi danh sách cột. Câu lệnh tự giải thích được nó điền gì, và không bị hỏng khi sau này bảng có thêm cột hoặc đổi thứ tự cột.
+
+## Thêm nhiều hàng một lúc
+
+`VALUES` nhận nhiều bộ giá trị, cách nhau bằng dấu phẩy, mỗi bộ là một hàng. Mỗi bộ trong ngoặc phải có cùng số giá trị với danh sách cột:
+
+<Playground>
+```sql
+INSERT INTO products (id, name, category, price, stock)
+VALUES (13, 'Trà gừng 100g', 'Trà', 90000, 40),
+       (14, 'Bánh cốm 200g', 'Bánh', 65000, 25);
+
+SELECT category,
+       COUNT(*) AS so_san_pham
+FROM products
+GROUP BY category
+ORDER BY category;
+```
+</Playground>
+
+Hai sản phẩm mới, trà gừng và bánh cốm. Bảng đếm cho thấy danh mục Bánh giờ có 3 sản phẩm (trước là 2), Trà có 4 (trước là 3); Cà phê và Dụng cụ không đổi.
+
+### Bỏ trống khóa chính?
+
+Bạn có thể tự hỏi: phải tự chọn mã 13, 14 à? `id` là khóa chính (primary key) của bảng (bài 15). Nếu bỏ cột `id` khỏi danh sách, SQLite tự cấp mã mới: cột khai báo `INTEGER PRIMARY KEY` lấy số lớn nhất hiện có cộng một (khách mới sẽ được mã 13). PostgreSQL với cùng định nghĩa bảng thì **báo lỗi** `null value in column "id" … violates not-null constraint`, vì cột `id` ở đây chỉ là số nguyên bình thường. PostgreSQL và MySQL có cách khai báo cột tự tăng riêng; lộ trình PostgreSQL và MySQL sẽ dạy. Trong khóa học, ta ghi mã rõ ràng để câu lệnh chạy giống nhau ở mọi nơi.
+
+## Thêm từ kết quả của SELECT
+
+Thay vì `VALUES`, phần dữ liệu có thể là một câu `SELECT`: mọi hàng của kết quả được thêm vào. Tình huống: Phạm Quốc Huy (khách 4) muốn **đặt lại y đơn 5** của mình, nhưng tính theo giá hiện tại.
+
+<Playground>
+```sql
+-- Bước 1: tạo đơn mới
+INSERT INTO orders (id, customer_id, ordered_on, status)
+VALUES (21, 4, '2025-11-20', 'chờ xác nhận');
+
+-- Bước 2: chép các món của đơn 5, lấy giá hiện tại
+INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+SELECT 21,
+       oi.product_id,
+       oi.quantity,
+       p.price
+FROM order_items AS oi
+INNER JOIN products AS p
+  ON p.id = oi.product_id
+WHERE oi.order_id = 5;
+
+-- Bước 3: so sánh hai đơn
+SELECT order_id,
+       product_id,
+       quantity,
+       unit_price
+FROM order_items
+WHERE order_id IN (5, 21)
+ORDER BY order_id, product_id;
+```
+</Playground>
+
+Đơn 21 có đúng 3 món như đơn 5: Robusta (mã 2) 1 gói, bình giữ nhiệt (mã 5) 1 cái, bánh pía (mã 8) 2 hộp. Khác biệt duy nhất là giá Robusta: 110000 ở đơn 5 (giá lúc đó), 120000 ở đơn 21 (giá hiện tại, lấy từ `p.price`). Đây đúng là lý do `order_items` có cột `unit_price` riêng (bài 15). (Bình giữ nhiệt và bánh pía đều đang hết hàng, `stock` bằng 0, mà đơn vẫn được tạo: `INSERT` không tự kiểm tra tồn kho; bài 30 sẽ bàn cách trừ kho và tạo đơn cùng lúc.)
+
+Câu `SELECT` trong bước 2 trả về 3 hàng, nên `INSERT` thêm 3 hàng. Số cột và thứ tự cột của `SELECT` phải khớp danh sách cột của `INSERT`; cột thứ nhất là hằng số `21`, giống mẹo hằng số ở bài 21. Bước 1 phải chạy trước bước 2: `order_items.order_id` là khóa ngoại (foreign key) trỏ tới `orders`, nên đơn 21 phải tồn tại trước đã.
+
+<Callout type="try">
+Bấm Khôi phục, rồi chỉ chạy bước 2 và bước 3 (xóa phần bước 1). Bước 2 sẽ báo lỗi khóa ngoại, vì đơn 21 chưa có.
+</Callout>
+
+## Khi dữ liệu vi phạm ràng buộc
+
+Bảng của cửa hàng được tạo với nhiều quy tắc, gọi là ràng buộc (constraint): khóa chính không trùng, một số cột không được NULL, email không trùng, giá phải dương, khóa ngoại phải trỏ tới hàng có thật. Mỗi `INSERT` vi phạm một quy tắc đều bị từ chối **toàn bộ**: không có hàng nào được thêm.
+
+<Playground expect="error">
+```sql
+-- Thiếu tên khách: cột name không được NULL
+INSERT INTO customers (id, city, joined_on)
+VALUES (13, 'Huế', '2025-11-20');
+```
+</Playground>
+
+SQLite báo `NOT NULL constraint failed: customers.name`. Thông báo nói rõ quy tắc nào bị vi phạm (`NOT NULL`, không được NULL) và ở cột nào (`customers.name`). Các lỗi khác có cùng dạng:
+
+| Vi phạm | Ví dụ | SQLite báo |
+|---|---|---|
+| Trùng khóa chính | thêm khách `id` 3 | `UNIQUE constraint failed: customers.id` |
+| Trùng email | thêm khách có email `ha.nguyen@example.com` | `UNIQUE constraint failed: customers.email` |
+| Giá không dương | thêm sản phẩm giá `-5000` | `CHECK constraint failed: price > 0` |
+| Khóa ngoại sai | thêm đơn cho khách 99 | `FOREIGN KEY constraint failed` (ô thực hành đã bật kiểm tra khóa ngoại; SQLite mặc định thì không, xem bài 15) |
+
+Đọc thông báo lỗi theo hai câu hỏi: **quy tắc nào** (`UNIQUE`, `NOT NULL`, `CHECK`, `FOREIGN KEY`) và **ở đâu** (tên bảng, tên cột). Khi một `INSERT` nhiều hàng có **một** hàng vi phạm, cả câu lệnh bị hủy, kể cả những hàng hợp lệ. Bài 27 sẽ dạy cách tự khai báo các ràng buộc này, và bài 30 giải thích vì sao "tất cả hoặc không gì cả" quan trọng.
+
+<Callout type="try">
+Chạy `INSERT INTO products (id, name, category, price, stock) VALUES (13, 'Trà A', 'Trà', 50000, 10), (14, 'Trà B', 'Trà', -5, 10);` ở ô thêm nhiều hàng phía trên: bấm Khôi phục, xóa câu lệnh có sẵn rồi dán câu này vào. Câu lệnh báo lỗi CHECK vì hàng thứ hai giá âm. Sau đó chạy riêng `SELECT COUNT(*) AS so_san_pham FROM products;`: vẫn là 12, tức là cả hàng thứ nhất (hợp lệ) cũng không được thêm.
+</Callout>
+
+## Bên trong database: INSERT làm những gì
+
+Khi bạn chạy `INSERT`, database làm hai loại việc:
+
+- **Theo từng hàng**: kiểm tra từng ràng buộc (trùng khóa chính, NOT NULL, CHECK, khóa ngoại) và cập nhật mọi index (chỉ mục) của bảng để hàng mới tìm được nhanh (bài 31). Thêm 100 hàng là làm 100 lần, dù viết một câu hay 100 câu.
+- **Theo từng câu lệnh**: đọc và phân tích câu lệnh, lập kế hoạch thực thi (execution plan), và quan trọng nhất là chốt thay đổi (commit): ghi nhật ký xuống đĩa để không mất dữ liệu nếu máy tắt đột ngột. Ghi xuống đĩa chậm hơn nhiều so với làm việc trong bộ nhớ.
+
+Một câu `INSERT` nhiều hàng, hoặc `INSERT … SELECT`, chỉ làm loại việc thứ hai **một lần** cho cả lô hàng; 100 câu `INSERT` riêng lẻ làm nó 100 lần. Đó là lý do thêm hàng loạt bằng một câu lệnh nhanh hơn nhiều. Bài 30 về transaction (giao dịch) sẽ cho thấy cách gộp nhiều câu lệnh vào một lần chốt.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Bỏ danh sách cột">
+`INSERT INTO bảng VALUES (…)` phụ thuộc vào thứ tự cột lúc tạo bảng. Thiếu giá trị thì SQLite báo lỗi, còn PostgreSQL có thể lặng lẽ điền mặc định cho cột còn lại; đủ giá trị nhưng sai thứ tự thì trên SQLite dữ liệu vào sai cột mà không lỗi nào báo, PostgreSQL chỉ bắt được khi giá trị không đổi được sang kiểu của cột. Luôn viết `INSERT INTO bảng (cột1, cột2, …) VALUES (…)`.
+</Callout>
+
+<Callout type="warn" title="Chạy lại cùng câu INSERT">
+Chạy một câu `INSERT` có mã cố định lần thứ hai sẽ báo `UNIQUE constraint failed` cho khóa chính. Database không "ghi đè" hàng cũ. Trong ô thực hành, bấm Khôi phục trước khi chạy lại.
+</Callout>
+
+<Callout type="warn" title="Số giá trị không khớp số cột">
+Danh sách cột có 4 cột mà `VALUES` có 3 hoặc 5 giá trị thì báo lỗi (SQLite báo `3 values for 4 columns` khi thiếu, `5 values for 4 columns` khi thừa). Với `INSERT … SELECT`, số cột của `SELECT` cũng phải khớp. Đếm lại hai bên khi gặp lỗi này.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| Nhiều hàng trong một `VALUES` | có | có | có |
+| `INSERT … SELECT` | có | có | có |
+| Bỏ `id` của cột `INTEGER PRIMARY KEY` | tự cấp mã | lỗi (cần cột tự tăng) | lỗi (cần `AUTO_INCREMENT`) |
+| Bỏ danh sách cột, thiếu giá trị | lỗi ngay | điền các cột đầu; lỗi chỉ khi cột bị bỏ không được NULL | lỗi |
+
+## Tóm tắt
+
+- `INSERT INTO bảng (cột, …) VALUES (giá_trị, …)` thêm một hàng; cột không nhắc tới nhận giá trị mặc định (thường là NULL).
+- Luôn ghi danh sách cột; giá trị khớp cột theo thứ tự.
+- `VALUES (…), (…)` thêm nhiều hàng trong một câu lệnh.
+- `INSERT INTO bảng (cột, …) SELECT …` thêm mọi hàng của một kết quả; số cột phải khớp.
+- Vi phạm ràng buộc (trùng khóa, NOT NULL, CHECK, khóa ngoại) làm cả câu `INSERT` bị từ chối; đọc lỗi theo "quy tắc nào, ở cột nào".
+
+## Bài tập
+
+<Exercise hint="INSERT một hàng với đủ 5 cột của products, rồi SELECT lại đúng sản phẩm đó.">
+Thêm sản phẩm mới: mã **13**, tên **'Cà phê Moka 250g'**, danh mục **'Cà phê'**, giá **185000**, tồn kho **30**. Sau đó lấy các sản phẩm danh mục Cà phê, gồm 3 cột theo thứ tự: tên, giá, tồn kho; sắp theo giá tăng dần.
+
+```sql
+INSERT INTO products (id, name, category, price, stock)
+VALUES (13, 'Cà phê Moka 250g', 'Cà phê', 185000, 30);
+
+SELECT name,
+       price,
+       stock
+FROM products
+WHERE category = 'Cà phê'
+ORDER BY price;
+```
+</Exercise>
+
+<Exercise hint="Một câu INSERT, VALUES có hai bộ giá trị. Cột email không cần nhắc tới; khách chưa có số điện thoại thì giá trị là NULL.">
+Thêm **hai** khách ở **Cần Thơ**, cả hai do khách 5 giới thiệu: khách **13** 'Mai Thu Trang', số điện thoại '0938000111', đăng ký '2025-11-20'; khách **14** 'Đỗ Văn Nam', chưa có số điện thoại, đăng ký '2025-11-21'. Sau đó lấy mọi khách ở Cần Thơ, gồm 4 cột theo thứ tự: tên, số điện thoại, mã người giới thiệu, ngày đăng ký; sắp theo mã khách.
+
+```sql
+INSERT INTO customers (id, name, city, phone, referred_by, joined_on)
+VALUES (13, 'Mai Thu Trang', 'Cần Thơ', '0938000111', 5, '2025-11-20'),
+       (14, 'Đỗ Văn Nam', 'Cần Thơ', NULL, 5, '2025-11-21');
+
+SELECT name,
+       phone,
+       referred_by,
+       joined_on
+FROM customers
+WHERE city = 'Cần Thơ'
+ORDER BY id;
+```
+</Exercise>
+
+<Exercise hint="Chạy thử và đọc thông báo lỗi theo hai câu hỏi: quy tắc nào, ở cột nào?" starter={"INSERT INTO customers (id, name, joined_on)\nVALUES (13, 'Phan Minh Châu', '2025-11-22');\n\nSELECT name, city\nFROM customers\nWHERE city = 'Đà Nẵng'\nORDER BY id;\n"}>
+Câu lệnh có sẵn trong ô muốn thêm khách **13** 'Phan Minh Châu' ở **Đà Nẵng**, đăng ký '2025-11-22', rồi liệt kê các khách ở Đà Nẵng. Câu `INSERT` đang báo lỗi. Đọc thông báo lỗi rồi sửa cho đúng (vẫn ghi rõ danh sách cột); kết quả cuối gồm 2 cột: tên, thành phố; sắp theo mã khách.
+
+```sql
+INSERT INTO customers (id, name, city, joined_on)
+VALUES (13, 'Phan Minh Châu', 'Đà Nẵng', '2025-11-22');
+
+SELECT name, city
+FROM customers
+WHERE city = 'Đà Nẵng'
+ORDER BY id;
+```
+</Exercise>
+
+<Exercise hint="Thêm khách mới có referred_by là 1, rồi đếm theo người giới thiệu như bài 13.">
+Thêm khách **13** 'Hồ Gia Bảo' ở **Hà Nội**, đăng ký '2025-11-22', do **chị Hà (khách 1)** giới thiệu. Sau đó, với mỗi người đã giới thiệu ít nhất một khách, đếm số người họ đã giới thiệu. Kết quả gồm 2 cột theo thứ tự: mã người giới thiệu, số người; sắp theo mã người giới thiệu.
+
+```sql
+INSERT INTO customers (id, name, city, referred_by, joined_on)
+VALUES (13, 'Hồ Gia Bảo', 'Hà Nội', 1, '2025-11-22');
+
+SELECT referred_by,
+       COUNT(*) AS so_nguoi
+FROM customers
+WHERE referred_by IS NOT NULL
+GROUP BY referred_by
+ORDER BY referred_by;
+```
+</Exercise>
+
+<Exercise hint="INSERT … SELECT, nối products để lấy giá hiện tại; số lượng tính từ số lượng cũ.">
+Chị Hà (khách 1) muốn **đặt lại đơn 1** của mình nhưng **gấp đôi số lượng** mỗi món, tính theo **giá hiện tại**. Tạo đơn **21** (đặt ngày '2025-11-20', trạng thái 'chờ xác nhận') và các món của nó. Sau đó lấy các món của đơn 21, gồm 3 cột theo thứ tự: **tên** sản phẩm, số lượng, giá; sắp theo tên sản phẩm.
+
+```sql
+INSERT INTO orders (id, customer_id, ordered_on, status)
+VALUES (21, 1, '2025-11-20', 'chờ xác nhận');
+
+INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+SELECT 21,
+       oi.product_id,
+       oi.quantity * 2,
+       p.price
+FROM order_items AS oi
+INNER JOIN products AS p
+  ON p.id = oi.product_id
+WHERE oi.order_id = 1;
+
+SELECT p.name,
+       oi.quantity,
+       oi.unit_price
+FROM order_items AS oi
+INNER JOIN products AS p
+  ON p.id = oi.product_id
+WHERE oi.order_id = 21
+ORDER BY p.name;
+```
+</Exercise>
+
+Thêm được rồi, nhưng dữ liệu cũng cần **sửa** (khách đổi số điện thoại, đơn được gửi đi) và **xóa** (đơn đã hủy không cần lưu). Bài tiếp theo giới thiệu `UPDATE` và `DELETE`, cùng thói quen an toàn để không sửa nhầm cả bảng.

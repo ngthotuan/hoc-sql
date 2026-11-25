@@ -265,6 +265,26 @@ function mutants(sql) {
       out0.push({ label: 'thay COALESCE(...) bằng giá trị đầu tiên của nó', sql: sql.slice(0, ci) + sql.slice(ci + 9, argEnd) + sql.slice(end + 1) });
     }
   }
+  // UNION giữa hai câu (đứng riêng một dòng): nếu một vế một mình cho cùng kết quả, vế kia thừa
+  const u = sql.replace(/;\s*$/, '').split(/\n\s*UNION(?:\s+ALL)?\s*\n/i);
+  if (u.length === 2 && !/^\s*WITH\b/i.test(sql)) {
+    u.forEach((part, i) => {
+      out0.push({ label: `chỉ giữ vế ${i + 1} của UNION`, sql: part.trim() + ';' });
+    });
+  }
+  // UPDATE/DELETE: bỏ WHERE của từng câu; nếu kết quả cuối không đổi, SELECT cuối không lộ ra hàng bị sửa/xóa thừa
+  const stmts = sql.split(/;\s*\n/);
+  if (stmts.length > 1) {
+    stmts.forEach((st, i) => {
+      if (!/^\s*(--[^\n]*\n\s*)*(UPDATE|DELETE)\b/i.test(st)) return;
+      const k = st.search(/\n\s*WHERE\b/i);
+      if (k < 0) return;
+      const copy = [...stmts];
+      copy[i] = st.slice(0, k);
+      out0.push({ label: `bỏ WHERE của câu ${/UPDATE/i.test(st) ? 'UPDATE' : 'DELETE'} thứ ${i + 1}`, sql: copy.join(';\n') });
+    });
+    return out0;
+  }
   const w = splitWhere(sql);
   if (!w) return out0;
   const build = (parts) =>
@@ -351,6 +371,14 @@ for (const lesson of files) {
       }
       if (commas >= 2) warn(at, `"${line.trim()}": từ 3 cột trở lên thì mỗi cột một dòng (style-guide mục 4)`);
     }
+    // Mỗi mệnh đề bắt đầu một dòng mới: dòng bắt đầu bằng SELECT không được chứa FROM
+    // (truy vấn con vô hướng trong ngoặc, ví dụ `> (SELECT AVG(price) FROM products)`, không bắt đầu dòng nên không bị bắt).
+    for (const line of code.split('\n')) {
+      // Chỉ bắt SELECT viết hoa: bài 2 cố ý viết thường trên một dòng để minh họa quy tắc khoảng trắng.
+      if (/^\s*SELECT\b/.test(line) && /\bFROM\b/.test(line.replace(/\([^()]*\)/g, ''))) {
+        warn(at, `"${line.trim()}": mỗi mệnh đề (FROM, WHERE…) bắt đầu một dòng mới (style-guide mục 4)`);
+      }
+    }
     // 1–2 cột thường (không biểu thức, không bí danh) thì viết cùng dòng SELECT.
     for (const m of code.matchAll(/^\s*SELECT\s+(?:DISTINCT\s+)?([\s\S]*?)\n\s*FROM\b/gim)) {
       const list = m[1];
@@ -421,6 +449,12 @@ for (const lesson of files) {
     }
     checkKeywords(at, ex.sql);
     checkFormat(at, ex.sql);
+    // Đề nói tới "đơn" nhưng không nêu trạng thái, trong khi dữ liệu có đơn đã hủy/chờ xác nhận:
+    // người học có thể hiểu là bỏ đơn hủy. Lỗi reviewer bắt lặp lại nhiều lần (style-guide mục 8).
+    if (/\borders\b/i.test(ex.sql) && !/\bstatus\b/i.test(ex.sql) && /đơn/.test(ex.prompt ?? '')
+        && !/trạng thái|đã giao|đã hủy|đang giao|chờ xác nhận/.test(ex.prompt ?? '')) {
+      warn(at, 'đề nói tới đơn mà không nêu trạng thái: ghi rõ "tính mọi trạng thái, kể cả đơn đã hủy" (hoặc lọc trạng thái)');
+    }
   }
 
   // Thuật ngữ

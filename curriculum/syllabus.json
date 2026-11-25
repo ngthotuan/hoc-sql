@@ -415,8 +415,9 @@
         "INTERSECT",
         "EXCEPT"
       ],
-      "status": "planned",
-      "notes": "Bài 17 đã hẹn: thay FULL JOIN trên MySQL bằng LEFT JOIN hai chiều ghép bằng UNION."
+      "status": "done",
+      "notes": "Bài 17 đã hẹn: thay FULL JOIN trên MySQL bằng LEFT JOIN hai chiều ghép bằng UNION.",
+      "recap": "Người học ghép kết quả theo chiều dọc bằng phép tập hợp: UNION (loại hàng trùng, kể cả trùng trong cùng một câu), UNION ALL (giữ mọi hàng, nhanh hơn), INTERSECT (phần chung: khách quay lại; khách vừa hủy vừa giao), EXCEPT (có ở câu đầu mà không có ở câu sau; thứ tự hai câu quan trọng). Nắm quy tắc: cùng số cột, ghép theo vị trí, cùng kiểu (PostgreSQL lỗi text/date, SQLite chạy; dùng CAST), tên cột lấy từ câu đầu, mỗi câu có WHERE/GROUP BY riêng, ORDER BY một lần ở cuối chỉ nhận tên/số cột; mẹo cột hằng số đánh dấu nhánh. Biết phép tập hợp coi NULL bằng nhau nên EXCEPT không mắc bẫy NOT IN; thay FULL JOIN trên MySQL bằng hai LEFT JOIN ngược chiều ghép UNION (đưa khóa chính cả hai bảng); trộn UNION với INTERSECT: SQLite làm trái sang phải, PostgreSQL ưu tiên INTERSECT, SQLite không cho ngoặc quanh SELECT → tách bước. Cùng bảng, cùng cột thì OR/IN gọn hơn."
     },
     {
       "id": "basics/22-cte",
@@ -431,7 +432,8 @@
       "introduces": [
         "WITH"
       ],
-      "status": "planned"
+      "status": "done",
+      "recap": "Người học viết CTE bằng WITH tên AS (SELECT …) để đặt tên cho bước trung gian ở đầu câu lệnh, dùng nó như một bảng (kể cả nối với bảng khác: trung bình danh mục cạnh từng sản phẩm), nhiều CTE cách nhau bằng dấu phẩy (không có dấu phẩy trước câu chính), CTE sau dùng CTE trước (tiền mỗi đơn → đơn đã giao → gom theo khách), dùng lại một CTE nhiều lần (trong FROM và truy vấn con, giữ cả trường hợp hòa thay vì LIMIT 1). Đã viết lại các câu lồng của bài 19 (gom hai lần), bài 21 (thay FULL JOIN) và bài 18 (tính riêng từng nhánh với SUM). Biết CTE chỉ sống trong câu lệnh (câu sau báo no such table; view ở bài 32), CTE trùng tên bảng che bảng thật (SQLite báo circular reference nếu đọc chính nó), database tự chọn gộp hay lưu tạm (AS MATERIALIZED), WITH RECURSIVE ở lộ trình PostgreSQL; MySQL có WITH từ 8.0."
     },
     {
       "id": "basics/23-window-function",
@@ -450,7 +452,8 @@
         "RANK",
         "DENSE_RANK"
       ],
-      "status": "planned"
+      "status": "done",
+      "recap": "Người học viết window function = hàm + OVER (…): tính trên cửa sổ các hàng liên quan mà không gộp hàng (OVER () là mọi hàng; PARTITION BY chia nhóm như GROUP BY nhưng giữ từng hàng; ORDER BY trong OVER quyết định thứ tự đánh số/cộng dồn, khác ORDER BY cuối câu). Dùng ROW_NUMBER (đánh số liên tục; hòa thì thứ tự không xác định, SQLite và PostgreSQL khác nhau → thêm tiêu chí phụ), RANK (đồng hạng rồi nhảy hạng), DENSE_RANK (đồng hạng, không nhảy); SUM(…) OVER (ORDER BY …) cho tổng lũy kế (hòa thì cùng giá trị). Biết window function chạy sau WHERE/GROUP BY/HAVING: không dùng trong WHERE (tính trong CTE rồi lọc: lấy hàng đầu tiên của mỗi nhóm), cửa sổ chỉ thấy hàng đã qua WHERE, dùng được trên kết quả đã gom (RANK() OVER (ORDER BY SUM(stock) DESC) không phải lồng hàm tổng hợp). SQLite có từ 3.25, MySQL từ 8.0; ROWS BETWEEN hẹn lộ trình PostgreSQL."
     },
     {
       "id": "basics/24-insert",
@@ -468,7 +471,8 @@
         "INTO",
         "VALUES"
       ],
-      "status": "planned"
+      "status": "done",
+      "recap": "Người học thêm dữ liệu bằng INSERT INTO bảng (cột, …) VALUES (…) (cột không nhắc tới nhận mặc định, thường là NULL), nhiều hàng trong một VALUES, và INSERT … SELECT (đặt lại đơn cũ theo giá hiện tại; số cột phải khớp; bảng cha trước bảng con vì khóa ngoại). Luôn ghi danh sách cột: bỏ đi thì SQLite đòi đủ mọi cột, PostgreSQL điền các cột đầu và có thể chạy thành công; sai thứ tự thì SQLite nhận chữ vào cột số không báo lỗi. Bỏ id: SQLite tự cấp mã cho INTEGER PRIMARY KEY, PostgreSQL lỗi (cột tự tăng ở lộ trình PostgreSQL/MySQL). Đọc lỗi ràng buộc theo 'quy tắc nào, ở cột nào' (NOT NULL, UNIQUE khóa chính/email, CHECK price > 0, FOREIGN KEY); một hàng vi phạm thì cả câu bị hủy. Biết việc theo hàng (kiểm ràng buộc, index) và việc theo câu lệnh (phân tích, chốt ghi đĩa) nên thêm hàng loạt nhanh hơn; hẹn transaction bài 30."
     },
     {
       "id": "basics/25-update-delete",
@@ -486,7 +490,8 @@
         "SET",
         "DELETE"
       ],
-      "status": "planned"
+      "status": "done",
+      "recap": "Người học sửa dữ liệu bằng UPDATE bảng SET cột = giá_trị, … WHERE … (nhiều cột, nhiều hàng; giá trị mới tính từ giá cũ, giữ số nguyên bằng price * 110 / 100; chạy lại là sửa thêm lần nữa) và xóa bằng DELETE FROM bảng WHERE …. Nắm thói quen an toàn: viết WHERE trước, chạy SELECT với cùng WHERE để đếm hàng, rồi mới sửa/xóa; quên WHERE thì sửa/xóa cả bảng không cảnh báo (MySQL có sql_safe_updates). Biết khóa ngoại chặn xóa hàng đang được trỏ tới (xóa order_items trước, orders sau; khách 1 bị chặn vì có đơn và đã giới thiệu người khác; CASCADE hẹn bài 27), so NULL trong WHERE dùng IS NULL còn = NULL trong SET là phép gán, và truy vấn con tương quan trong SET (nhắc bảng ngoài bằng tên bảng, cần WHERE để tránh NULL; SUM khi một sản phẩm nằm ở nhiều đơn). Ràng buộc NOT NULL/CHECK kiểm theo từng hàng, khóa ngoại báo lỗi cuối câu; một vi phạm là hủy cả câu."
     },
     {
       "id": "basics/26-create-table",

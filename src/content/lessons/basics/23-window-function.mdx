@@ -1,0 +1,301 @@
+---
+title: Window function nhập môn
+description: Tính toán trên một nhóm hàng mà vẫn giữ từng hàng bằng OVER, chia nhóm với PARTITION BY, đánh số và xếp hạng với ROW_NUMBER, RANK, DENSE_RANK, và tính tổng lũy kế.
+order: 23
+---
+
+Với `GROUP BY` (bài 13), bạn phải chọn một trong hai: giữ từng hàng (row) thì không có số liệu của nhóm; gom nhóm thì có số liệu nhưng **mất** từng hàng (4 đơn của chị Hà thu lại thành một hàng "4 đơn"). Các cách đã học sau đó, truy vấn con tương quan (correlated subquery, bài 20) và CTE (common table expression) kèm `JOIN` (bài 22), làm được cả hai nhưng phải viết vòng. Câu hỏi bài 22 để lại, "mỗi đơn là lần đặt thứ mấy của khách đó", cần cả hai: vẫn giữ từng đơn, nhưng biết vị trí của nó trong nhóm đơn của khách.
+
+Bài này giới thiệu window function (hàm cửa sổ): hàm tính trên một nhóm hàng liên quan (gọi là cửa sổ) nhưng **không gộp** các hàng lại. Mỗi hàng vẫn ở nguyên, chỉ được thêm một cột (column) mang kết quả tính trên cửa sổ của nó.
+
+## OVER: hàm tổng hợp không gộp hàng
+
+Lấy một hàm tổng hợp (aggregate function) quen thuộc như `AVG`, thêm `OVER (…)` phía sau, nó trở thành window function:
+
+<Playground>
+```sql
+SELECT name,
+       category,
+       price,
+       AVG(price) OVER (PARTITION BY category) AS gia_tb_danh_muc,
+       COUNT(*) OVER () AS tong_so_hang
+FROM products
+WHERE category IN ('Bánh', 'Trà')
+ORDER BY category, price;
+```
+</Playground>
+
+Kết quả (result set) có đủ **5** hàng, mỗi sản phẩm một hàng, không bị gộp như `GROUP BY`. Cột `gia_tb_danh_muc` của hai loại bánh đều là 65000, trung bình của nhóm bánh; của ba loại trà đều là khoảng 263333, trung bình của nhóm trà. Cột `tong_so_hang` là 5 ở mọi hàng.
+
+Đọc phần `OVER`:
+
+- `OVER ()` để trống: cửa sổ là **mọi hàng** của kết quả. `COUNT(*) OVER ()` đếm cả 5 hàng và ghi con số đó vào từng hàng.
+- `OVER (PARTITION BY category)`: chia các hàng thành nhóm theo `category`, giống `GROUP BY`, nhưng **không gộp**. Mỗi hàng nhìn thấy cửa sổ là các hàng cùng danh mục với nó, và `AVG` tính trên cửa sổ đó.
+
+Bài 20 dùng truy vấn con tương quan để **so** với trung bình danh mục; bài 22 cần CTE kèm `JOIN` để **hiện** con số đó cạnh từng sản phẩm. Window function làm việc đó trong một biểu thức (expression).
+
+Lưu ý: cửa sổ được tính trên các hàng **còn lại sau `WHERE`**. Ở đây `WHERE` đã bỏ cà phê và dụng cụ, nên `COUNT(*) OVER ()` ra 5 chứ không phải 12.
+
+## Đánh số với ROW_NUMBER
+
+`ROW_NUMBER()` đánh số thứ tự 1, 2, 3… cho các hàng trong cửa sổ, theo thứ tự ghi trong `ORDER BY` **bên trong** `OVER`. Đây là câu trả lời cho câu hỏi của bài 22:
+
+<Playground>
+```sql
+SELECT customer_id,
+       id AS ma_don,
+       ordered_on,
+       ROW_NUMBER() OVER (
+         PARTITION BY customer_id
+         ORDER BY ordered_on
+       ) AS lan_dat_thu
+FROM orders
+WHERE customer_id IN (1, 2, 6)
+ORDER BY customer_id, ordered_on;
+```
+</Playground>
+
+Mười đơn của ba khách. Đơn 1 (2025-03-02) là lần đặt thứ 1 của Nguyễn Thu Hà (khách 1), đơn 3 là lần thứ 2, đơn 11 là lần thứ 3, đơn 18 là lần thứ 4. Sang Trần Minh Khoa (khách 2), số đếm **bắt đầu lại từ 1**: đơn 2 là lần thứ 1, đơn 6 lần thứ 2, đơn 16 lần thứ 3. Đặng Gia Linh (khách 6) cũng vậy. `PARTITION BY customer_id` chia đơn theo khách, `ORDER BY ordered_on` trong `OVER` quyết định thứ tự đánh số trong mỗi khách.
+
+Có hai `ORDER BY` trong câu lệnh (statement) này, và chúng làm hai việc khác nhau. `ORDER BY` trong `OVER` chỉ quyết định cách **đánh số**; `ORDER BY` ở cuối câu quyết định thứ tự **hiển thị** của kết quả. Bỏ cái cuối thì số `lan_dat_thu` vẫn đúng, nhưng các hàng có thể hiện theo thứ tự bất kỳ.
+
+## Xếp hạng: ROW_NUMBER, RANK, DENSE_RANK khi có hòa
+
+Ba hàm đánh số khác nhau ở cách xử lý các hàng **hòa nhau**:
+
+<Playground>
+```sql
+SELECT name,
+       stock,
+       ROW_NUMBER() OVER (ORDER BY stock) AS so_thu_tu,
+       RANK() OVER (ORDER BY stock) AS hang,
+       DENSE_RANK() OVER (ORDER BY stock) AS hang_lien_tiep
+FROM products
+WHERE stock < 60
+ORDER BY stock, name;
+```
+</Playground>
+
+Tám sản phẩm trong bảng (table) `products` có tồn kho dưới 60, sắp từ ít tới nhiều. Bánh pía và bình giữ nhiệt cùng tồn 0, hòa nhau ở đầu bảng:
+
+- `ROW_NUMBER` luôn cho mỗi hàng một số khác nhau: một trong hai sản phẩm số 1, cái kia số 2. **Cái nào số 1 là không xác định**: trên SQLite, bình giữ nhiệt được số 1; trên PostgreSQL, bánh pía được số 1. Đây là bẫy hòa nhau của bài 8.
+- `RANK` cho cả hai hạng 1, rồi **nhảy** sang hạng 3 cho trà sen (tồn 8): hạng 2 bị bỏ qua, như bảng xếp hạng thể thao có hai người đồng hạng nhất.
+- `DENSE_RANK` cũng cho cả hai hạng 1, nhưng **không nhảy**: trà sen hạng 2. Các hạng liên tiếp nhau.
+
+Từ trà sen trở đi không có hòa, nên `ROW_NUMBER` và `RANK` giống nhau (3, 4, 5…), còn `DENSE_RANK` luôn kém một bậc (2, 3, 4…).
+
+Để ý trên SQLite: bình giữ nhiệt được số 1 dù hiện ở hàng thứ hai, vì `ORDER BY` cuối câu sắp theo tên, còn `ORDER BY` trong `OVER` chỉ sắp theo tồn kho (như phần trước đã nói).
+
+Chọn hàm theo câu hỏi. Cần đúng một hàng cho mỗi vị trí (ví dụ lấy đơn đầu tiên của mỗi khách) thì `ROW_NUMBER`, kèm tiêu chí phụ trong `ORDER BY` để không có hòa. Cần xếp hạng công bằng (đồng hạng thì cùng hạng) thì `RANK` hoặc `DENSE_RANK`.
+
+## Tổng lũy kế
+
+Khi `OVER` có `ORDER BY`, hàm tổng hợp như `SUM` hay `COUNT` tính trên cửa sổ **từ hàng đầu tiên tới hàng hiện tại**, tức là cộng dồn. Dùng CTE của bài 22 để có tổng tiền mỗi đơn trước:
+
+<Playground>
+```sql
+WITH tien_moi_don AS (
+  SELECT o.id,
+         o.ordered_on,
+         SUM(oi.quantity * oi.unit_price) AS tong_tien
+  FROM orders AS o
+  INNER JOIN order_items AS oi
+    ON oi.order_id = o.id
+  WHERE o.status = 'đã giao'
+  GROUP BY o.id, o.ordered_on
+)
+SELECT id,
+       ordered_on,
+       tong_tien,
+       SUM(tong_tien) OVER (ORDER BY ordered_on) AS doanh_thu_luy_ke
+FROM tien_moi_don
+WHERE ordered_on >= '2025-06-01'
+ORDER BY ordered_on;
+```
+</Playground>
+
+Tám đơn đã giao từ tháng 6. Đơn 6 (290000) mở đầu, lũy kế 290000. Đơn 7 (449000) đưa lũy kế lên 739000. Đơn 8 (220000) lên 959000. Cứ thế tới đơn 14 (615000), lũy kế cuối là 3049000. Mỗi hàng cho biết doanh thu cộng dồn **từ đầu tháng 6 tới ngày đó**.
+
+Vì `WHERE` chạy trước cửa sổ (như ở playground đầu bài), các đơn đã giao trước tháng 6 không được cộng. Muốn lũy kế từ đơn đầu tiên mà chỉ hiện từ tháng 6, hãy tính `SUM … OVER` trong một CTE không lọc ngày, rồi lọc ngày ở câu chính.
+
+<Callout type="try">
+Bỏ `ORDER BY ordered_on` bên trong `OVER` (để lại `OVER ()`) rồi chạy lại: cả tám hàng cùng có `doanh_thu_luy_ke` là 3049000, tổng của cả cửa sổ. Chính `ORDER BY` trong `OVER` biến tổng thành cộng dồn.
+</Callout>
+
+Cả tám đơn có ngày đặt khác nhau. Nếu hai hàng có cùng giá trị trong `ORDER BY` của `OVER`, cả hai sẽ nhận **cùng** con số lũy kế (đã cộng cả hai), vì mặc định cửa sổ gồm mọi hàng "đứng trước hoặc ngang hàng" với hàng hiện tại. Lộ trình PostgreSQL sẽ dạy cách điều chỉnh chính xác cửa sổ này (`ROWS BETWEEN …`).
+
+## Lọc và xếp hạng trên kết quả của window function
+
+Hai cách dùng window function rất hay gặp cần thêm một chút kỹ thuật.
+
+**Lấy hàng đầu tiên của mỗi nhóm.** Ví dụ: đơn **đầu tiên** của mỗi khách. Window function không đặt được trong `WHERE` (phần sau giải thích vì sao), nên ta đánh số trong một CTE rồi lọc ở câu chính:
+
+<Playground>
+```sql
+WITH danh_so AS (
+  SELECT customer_id,
+         id,
+         ordered_on,
+         ROW_NUMBER() OVER (
+           PARTITION BY customer_id
+           ORDER BY ordered_on, id
+         ) AS lan_dat_thu
+  FROM orders
+)
+SELECT customer_id,
+       id AS ma_don,
+       ordered_on
+FROM danh_so
+WHERE lan_dat_thu = 1
+ORDER BY ordered_on;
+```
+</Playground>
+
+Chín khách có đơn, mỗi khách một hàng: đơn đầu tiên của họ. Nguyễn Thu Hà mở đầu với đơn 1 ngày 2025-03-02, Trần Minh Khoa với đơn 2 ngày 2025-03-04, và người đặt đơn đầu tiên muộn nhất là khách 11 (đơn 15, ngày 2025-10-30). CTE đánh số mọi đơn như playground `ROW_NUMBER` ở trên; câu chính chỉ giữ hàng mang số 1. `id` trong `ORDER BY` của `OVER` là tiêu chí phụ: nếu một khách có hai đơn cùng ngày, `ROW_NUMBER` vẫn chọn đúng một đơn một cách ổn định (dữ liệu hiện tại không có trường hợp này). Đây là mẫu "lấy hàng đầu tiên của mỗi nhóm", một trong những cách dùng `ROW_NUMBER` hay gặp nhất.
+
+**Xếp hạng chính các nhóm sau `GROUP BY`.** Ví dụ: xếp hạng các danh mục theo tổng tồn kho.
+
+<Playground>
+```sql
+SELECT category,
+       SUM(stock) AS ton_kho,
+       RANK() OVER (ORDER BY SUM(stock) DESC) AS hang
+FROM products
+GROUP BY category
+ORDER BY hang;
+```
+</Playground>
+
+Bốn danh mục: Dụng cụ (192) hạng 1, Cà phê (165) hạng 2, Bánh (150) hạng 3, Trà (73) hạng 4. Cách viết `RANK() OVER (ORDER BY SUM(stock) DESC)` trông như lồng hàm tổng hợp vào nhau, điều bài 12 đã nói là lỗi, nhưng không phải: `SUM(stock)` được tính xong ở bước `GROUP BY` (mỗi danh mục một con số), rồi window function chạy **sau** đó và chỉ dùng con số đã có để xếp hạng bốn hàng.
+
+## Bên trong database: window function chạy sau GROUP BY
+
+Thứ tự xử lý của bài 14 có thêm một bước: về logic, window function được tính **sau** `WHERE`, `GROUP BY` và `HAVING`, ngay trước khi `SELECT` xuất cột, và trước `ORDER BY` cuối (bạn vẫn viết window function trong danh sách cột của `SELECT`):
+
+**FROM** → **WHERE** → **GROUP BY** → **HAVING** → **window function** → **SELECT** → **ORDER BY** → **LIMIT**
+
+Có hai hệ quả, đúng với hai kỹ thuật ở phần trên:
+
+- Window function **không dùng được trong `WHERE`**: lúc `WHERE` chạy, chưa có cửa sổ nào. Vì vậy phải tính trong CTE rồi lọc ở câu chính.
+- Window function dùng được **trên kết quả đã gom**: khi nó chạy, `GROUP BY` đã tính xong các hàm tổng hợp.
+
+Để tính, database thường sắp xếp các hàng theo `PARTITION BY` rồi `ORDER BY` của `OVER`, rồi đi qua từng nhóm một lượt. Nhiều window function có cùng `OVER` dùng chung một lần sắp xếp.
+
+## Lỗi hay gặp
+
+<Callout type="warn" title="Window function trong WHERE">
+`WHERE ROW_NUMBER() OVER (ORDER BY id) = 1` báo lỗi: SQLite ghi `misuse of window function ROW_NUMBER()`, PostgreSQL ghi `window functions are not allowed in WHERE`. Tính trong CTE trước (`WITH t AS (SELECT …, ROW_NUMBER() OVER (…) AS thu_tu FROM …)`), rồi `WHERE thu_tu = 1` ở câu chính.
+</Callout>
+
+<Callout type="warn" title="Quên rằng WHERE chạy trước cửa sổ">
+Lọc `WHERE status = 'đang giao'` rồi tính `COUNT(*) OVER (PARTITION BY customer_id)` thì chỉ đếm được đơn **đang giao** của mỗi khách, không phải mọi đơn. Muốn cửa sổ nhìn thấy mọi đơn, tính window function trong CTE (không lọc), rồi mới lọc ở câu chính.
+</Callout>
+
+<Callout type="warn" title="ROW_NUMBER khi có hòa">
+`ROW_NUMBER() OVER (ORDER BY stock)` với hai sản phẩm cùng tồn 0 cho số 1, 2 theo thứ tự không xác định, khác nhau giữa SQLite và PostgreSQL. Thêm tiêu chí phụ (`ORDER BY stock, id`) để kết quả ổn định.
+</Callout>
+
+## Khác nhau giữa các database
+
+| | SQLite | PostgreSQL | MySQL |
+|---|---|---|---|
+| Window function | có (từ bản 3.25, năm 2018) | có | có (từ bản 8.0) |
+| `ROW_NUMBER`, `RANK`, `DENSE_RANK` | có | có | có |
+| Window function trong `WHERE` | lỗi | lỗi | lỗi |
+
+MySQL 5.7 trở về trước không có window function; các hệ thống cũ thường mô phỏng bằng biến người dùng hoặc truy vấn con tương quan, chậm và khó đọc hơn nhiều (lộ trình MySQL sẽ nói thêm).
+
+## Tóm tắt
+
+- Window function = hàm + `OVER (…)`: tính trên một cửa sổ các hàng liên quan nhưng **không gộp** hàng; mỗi hàng giữ nguyên và có thêm cột kết quả.
+- `OVER ()` là mọi hàng; `PARTITION BY` chia nhóm như `GROUP BY` mà không gộp; `ORDER BY` trong `OVER` quyết định thứ tự đánh số hoặc cộng dồn, khác `ORDER BY` cuối câu.
+- `ROW_NUMBER` đánh số liên tục (hòa thì thứ tự không xác định); `RANK` đồng hạng rồi nhảy hạng; `DENSE_RANK` đồng hạng, không nhảy.
+- `SUM(…) OVER (ORDER BY …)` cho tổng lũy kế.
+- Window function chạy sau `WHERE`/`GROUP BY`/`HAVING`: không dùng được trong `WHERE` (tính trong CTE rồi lọc), và cửa sổ chỉ nhìn thấy hàng đã qua `WHERE`.
+
+## Bài tập
+
+<Exercise hint="RANK với PARTITION BY danh mục, sắp giá giảm dần bên trong OVER.">
+Xếp hạng các sản phẩm theo giá **từ cao xuống thấp trong từng danh mục**, dùng `RANK`. Kết quả gồm 4 cột theo thứ tự: danh mục, tên sản phẩm, giá, hạng; sắp theo danh mục, rồi theo hạng.
+
+```sql
+SELECT category,
+       name,
+       price,
+       RANK() OVER (
+         PARTITION BY category
+         ORDER BY price DESC
+       ) AS hang
+FROM products
+ORDER BY category, hang;
+```
+</Exercise>
+
+<Exercise hint="COUNT(*) với OVER có ORDER BY cho số đếm cộng dồn. Lọc khách đăng ký từ đầu năm 2025 trước.">
+Với các khách **đăng ký từ ngày 2025-01-01 trở đi**, cho biết tính tới ngày đăng ký của mỗi người, cửa hàng đã có **bao nhiêu khách mới trong năm 2025** (tính cả người đó). Kết quả gồm 3 cột theo thứ tự: tên khách, ngày đăng ký, số khách mới lũy kế; sắp theo ngày đăng ký.
+
+```sql
+SELECT name,
+       joined_on,
+       COUNT(*) OVER (ORDER BY joined_on) AS luy_ke
+FROM customers
+WHERE joined_on >= '2025-01-01'
+ORDER BY joined_on;
+```
+</Exercise>
+
+<Exercise hint="Chạy thử và đọc thông báo lỗi. Đánh số trong một CTE, rồi lọc ở câu chính." starter={"SELECT category,\n       name,\n       price\nFROM products\nWHERE ROW_NUMBER() OVER (\n        PARTITION BY category\n        ORDER BY price DESC\n      ) = 1;\n"}>
+Câu lệnh có sẵn trong ô muốn lấy **sản phẩm đắt nhất của mỗi danh mục**, nhưng báo lỗi. Hãy sửa cho đúng. Kết quả gồm 3 cột theo thứ tự: danh mục, tên sản phẩm, giá.
+
+```sql
+WITH xep_hang AS (
+  SELECT category,
+         name,
+         price,
+         ROW_NUMBER() OVER (
+           PARTITION BY category
+           ORDER BY price DESC, id
+         ) AS thu_tu
+  FROM products
+)
+SELECT category,
+       name,
+       price
+FROM xep_hang
+WHERE thu_tu = 1;
+```
+</Exercise>
+
+<Exercise hint="Gom đơn theo khách trước (GROUP BY), rồi xếp hạng trên kết quả đã gom. Đồng hạng thì cùng hạng, và các hạng phải liên tiếp: chọn đúng hàm.">
+Chỉ xét các khách **đã có ít nhất một đơn**, xếp hạng họ theo **số đơn đã đặt** (mọi trạng thái), nhiều đơn nhất hạng 1: khách cùng số đơn thì cùng hạng, và các hạng **liên tiếp nhau** (không nhảy hạng). Kết quả gồm 3 cột theo thứ tự: mã khách, số đơn, hạng; sắp theo hạng, rồi theo mã khách.
+
+```sql
+SELECT customer_id,
+       COUNT(*) AS so_don,
+       DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS hang
+FROM orders
+GROUP BY customer_id
+ORDER BY hang, customer_id;
+```
+</Exercise>
+
+<Exercise hint="Cửa sổ chỉ nhìn thấy những hàng đã qua WHERE.">
+Với mỗi đơn **chờ xác nhận**, cho biết khách đặt đơn đó có **tổng cộng bao nhiêu đơn** (mọi trạng thái). Kết quả gồm 3 cột theo thứ tự: mã đơn, mã khách, tổng số đơn của khách.
+
+```sql
+WITH dem AS (
+  SELECT id,
+         customer_id,
+         status,
+         COUNT(*) OVER (PARTITION BY customer_id) AS so_don
+  FROM orders
+)
+SELECT id,
+       customer_id,
+       so_don
+FROM dem
+WHERE status = 'chờ xác nhận';
+```
+</Exercise>
+
+Đến đây bạn đã đọc dữ liệu theo đủ cách: lọc, gom, nối, lồng, xếp hạng. Nhưng mọi câu lệnh đều chỉ **đọc**. Bài tiếp theo bắt đầu phần thay đổi dữ liệu: thêm hàng mới vào bảng với `INSERT`.

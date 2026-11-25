@@ -265,7 +265,7 @@ Chạy được trên SQLite không có nghĩa là chạy được trên Postgre
 ## Bài tập
 
 <Exercise hint="Đơn chưa gửi là đơn có shipped_on là NULL. Lọc ngày bằng >= như bài 4.">
-Với các đơn đặt **từ ngày 2025-11-01 trở đi**, lấy 2 cột theo thứ tự: mã đơn, và cột tình trạng gửi có giá trị `'đã gửi'` nếu đơn đã có ngày gửi, `'chưa gửi'` nếu chưa.
+Với các đơn đặt **từ ngày 2025-11-01 trở đi** (tính mọi trạng thái), lấy 2 cột theo thứ tự: mã đơn, và cột tình trạng gửi có giá trị `'đã gửi'` nếu đơn đã có ngày gửi, `'chưa gửi'` nếu chưa.
 
 ```sql
 SELECT id,

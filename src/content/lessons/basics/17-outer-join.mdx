@@ -231,7 +231,7 @@ WHERE oi.product_id IS NULL;
 </Exercise>
 
 <Exercise hint="Khách chưa có đơn ở Hà Nội: một điều kiện về khách (bảng bên trái), một điều kiện về việc không có cặp.">
-Có khách nào **ở Hà Nội** mà **chưa đặt đơn nào** không? Kết quả gồm 2 cột theo thứ tự: mã khách, tên khách.
+Có khách nào **ở Hà Nội** mà **chưa đặt đơn nào** (tính cả đơn đã hủy) không? Kết quả gồm 2 cột theo thứ tự: mã khách, tên khách.
 
 ```sql
 SELECT c.id, c.name

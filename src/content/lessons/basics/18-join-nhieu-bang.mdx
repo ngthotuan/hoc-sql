@@ -250,7 +250,7 @@ ORDER BY gia_combo;
 </Exercise>
 
 <Exercise hint="Chạy thử rồi so với số đơn thật của từng khách. Một đơn có thể có hai sản phẩm cà phê." starter={"SELECT o.customer_id,\n       COUNT(*) AS so_don\nFROM orders AS o\nINNER JOIN order_items AS oi\n  ON oi.order_id = o.id\nINNER JOIN products AS p\n  ON p.id = oi.product_id\nWHERE p.category = 'Cà phê'\nGROUP BY o.customer_id;\n"}>
-Câu lệnh có sẵn trong ô muốn đếm, với mỗi khách, **số đơn có mua ít nhất một sản phẩm cà phê** (danh mục `Cà phê`), nhưng đếm sai cho một khách. Hãy sửa cho đúng, giữ nguyên 2 cột.
+Câu lệnh có sẵn trong ô muốn đếm, với mỗi khách, **số đơn có mua ít nhất một sản phẩm cà phê** (danh mục `Cà phê`, tính mọi trạng thái đơn), nhưng đếm sai cho một khách. Hãy sửa cho đúng, giữ nguyên 2 cột.
 
 ```sql
 SELECT o.customer_id,

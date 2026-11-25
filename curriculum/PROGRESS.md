@@ -2,9 +2,9 @@
 
 > File này do `npm run validate` tự sinh từ `syllabus.json`. Đừng sửa tay.
 
-**Bài cần làm tiếp theo:** `basics/21-phep-tap-hop` (UNION, INTERSECT, EXCEPT), trạng thái: Chưa viết
+**Bài cần làm tiếp theo:** `basics/26-create-table` (Tạo bảng và kiểu dữ liệu), trạng thái: Chưa viết
 
-## SQL từ con số 0: 20/33 bài xong
+## SQL từ con số 0: 25/33 bài xong
 
 | # | Module | Bài | Trạng thái |
 |---|---|---|---|
@@ -28,11 +28,11 @@
 | 18 | Nhiều bảng | Nối nhiều bảng và tự nối | Xong |
 | 19 | Truy vấn lồng nhau | Truy vấn con | Xong |
 | 20 | Truy vấn lồng nhau | EXISTS và truy vấn con tương quan | Xong |
-| 21 | Truy vấn lồng nhau | UNION, INTERSECT, EXCEPT | Chưa viết |
-| 22 | Truy vấn nâng cao | CTE với WITH | Chưa viết |
-| 23 | Truy vấn nâng cao | Window function nhập môn | Chưa viết |
-| 24 | Thay đổi dữ liệu | Thêm dữ liệu với INSERT | Chưa viết |
-| 25 | Thay đổi dữ liệu | Sửa và xóa với UPDATE, DELETE | Chưa viết |
+| 21 | Truy vấn lồng nhau | UNION, INTERSECT, EXCEPT | Xong |
+| 22 | Truy vấn nâng cao | CTE với WITH | Xong |
+| 23 | Truy vấn nâng cao | Window function nhập môn | Xong |
+| 24 | Thay đổi dữ liệu | Thêm dữ liệu với INSERT | Xong |
+| 25 | Thay đổi dữ liệu | Sửa và xóa với UPDATE, DELETE | Xong |
 | 26 | Thiết kế bảng | Tạo bảng và kiểu dữ liệu | Chưa viết |
 | 27 | Thiết kế bảng | Ràng buộc dữ liệu | Chưa viết |
 | 28 | Thiết kế bảng | Thay đổi và xóa bảng | Chưa viết |
