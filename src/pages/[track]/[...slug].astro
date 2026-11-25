@@ -79,6 +79,21 @@ const { Content } = await render(lesson);
         });
         sync();
       })();
+
+      // Cuộn mục lục tới bài đang đọc (chỉ cuộn khung mục lục, không cuộn trang)
+      (function () {
+        var nav = document.querySelector('.toc ol');
+        var cur = nav && nav.querySelector('[aria-current="page"]');
+        if (!cur) return;
+        function center() {
+          if (nav.scrollHeight <= nav.clientHeight) return;
+          var delta = cur.getBoundingClientRect().top - nav.getBoundingClientRect().top;
+          nav.scrollTop += delta - nav.clientHeight / 2 + cur.offsetHeight / 2;
+        }
+        center();
+        // Font tải xong làm chiều cao các dòng đổi, nên căn lại một lần nữa
+        if (document.fonts) document.fonts.ready.then(center);
+      })();
     </script>
 
     <main id="main" class="prose">
@@ -103,10 +118,29 @@ const { Content } = await render(lesson);
   }
 
   /* Mục lục */
-  .toc { position: sticky; top: var(--space-5); align-self: start; font-size: var(--step--1); }
+  .toc {
+    position: sticky;
+    top: var(--space-5);
+    align-self: start;
+    font-size: var(--step--1);
+  }
   .toc summary { display: none; }
   .toc-track { display: block; font-weight: 700; text-decoration: none; margin-bottom: var(--space-3); color: var(--ink); }
   .toc ol { margin: 0; padding-left: 1.5rem; color: var(--ink-faint); }
+  /* Máy tính: danh sách dài hơn màn hình thì cuộn riêng; nút ẩn/hiện và tên lộ trình đứng yên.
+     12rem ≈ header trang + nút + tên lộ trình + khoảng cách, để đáy danh sách luôn nằm trong màn hình. */
+  @media (min-width: 861px) {
+    .toc ol {
+      max-height: calc(100vh - 12rem);
+      max-height: calc(100dvh - 12rem);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+      /* Khung cuộn cắt phần tràn: nới lề trái để số thứ tự hai chữ số không bị cắt */
+      padding-left: 2.1rem;
+      margin-left: -0.6rem;
+    }
+  }
   .toc li { padding: 0.2rem 0; }
   .toc li::marker { font-family: var(--font-code); font-size: 0.8rem; }
   .toc li a {
